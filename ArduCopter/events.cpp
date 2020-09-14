@@ -149,30 +149,50 @@ void Copter::failsafe_gcs_check()
 void Copter::failsafe_gcs_on_event(void)
 {
     AP::logger().Write_Error(LogErrorSubsystem::FAILSAFE_GCS, LogErrorCode::FAILSAFE_OCCURRED);
-    RC_Channels::clear_overrides();
-
+	
+	////////////////////////////////////////////////////////////////
+	//// HF CHANGES
+	////
+	//// Do not clear channels
+    //// RC_Channels::clear_overrides();
+	////
     // convert the desired failsafe response to the Failsafe_Action enum
     Failsafe_Action desired_action;
-    switch (g.failsafe_gcs) {
-        case FS_GCS_DISABLED:
-            desired_action = Failsafe_Action_None;
-            break;
-        case FS_GCS_ENABLED_ALWAYS_RTL:
-        case FS_GCS_ENABLED_CONTINUE_MISSION:
-            desired_action = Failsafe_Action_RTL;
-            break;
-        case FS_GCS_ENABLED_ALWAYS_SMARTRTL_OR_RTL:
-            desired_action = Failsafe_Action_SmartRTL;
-            break;
-        case FS_GCS_ENABLED_ALWAYS_SMARTRTL_OR_LAND:
-            desired_action = Failsafe_Action_SmartRTL_Land;
-            break;
-        case FS_GCS_ENABLED_ALWAYS_LAND:
-            desired_action = Failsafe_Action_Land;
-            break;
-        default: // if an invalid parameter value is set, the fallback is RTL
-            desired_action = Failsafe_Action_RTL;
-    }
+	//// Always land in place if the failsafe occurs
+	switch (g.failsafe_gcs) {
+		case FS_GCS_DISABLED:
+		desired_action = Failsafe_Action_None;
+		break;		
+		default:
+		desired_action = Failsafe_Action_Land;
+		break;
+	}
+	////////////////////////////////////////////////////////////////
+	//// Always take the land action
+	////
+    //// switch (g.failsafe_gcs) {
+    ////    case FS_GCS_DISABLED:
+    ////        desired_action = Failsafe_Action_None;
+    ////        break;
+    ////    case FS_GCS_ENABLED_ALWAYS_RTL:
+    ////    case FS_GCS_ENABLED_CONTINUE_MISSION:
+    ////        desired_action = Failsafe_Action_RTL;
+    ////        break;
+    ////    case FS_GCS_ENABLED_ALWAYS_SMARTRTL_OR_RTL:
+    ////        desired_action = Failsafe_Action_SmartRTL;
+    ////        break;
+    ////    case FS_GCS_ENABLED_ALWAYS_SMARTRTL_OR_LAND:
+    ////        desired_action = Failsafe_Action_SmartRTL_Land;
+    ////        break;
+    ////    case FS_GCS_ENABLED_ALWAYS_LAND:
+    ////        desired_action = Failsafe_Action_Land;
+    ////        break;
+    ////    default: // if an invalid parameter value is set, the fallback is RTL
+    ////        desired_action = Failsafe_Action_RTL;
+    //// }
+	////
+	//// HF CHANGES - END
+	////////////////////////////////////////////////////////////////
 
     // Conditions to deviate from FS_GCS_ENABLE parameter setting
     if (!motors->armed()) {
