@@ -716,6 +716,7 @@ struct PACKED log_PSCZ {
 // UNIT messages define units which can be referenced by FMTU messages
 // FMTU messages associate types (e.g. centimeters/second/second) to FMT message fields
 
+<<<<<<< HEAD
 #define PID_LABELS "TimeUS,Tar,Act,Err,P,I,D,FF,Dmod,SRate,Limit"
 #define PID_FMT    "QfffffffffB"
 #define PID_UNITS  "s----------"
@@ -1206,6 +1207,89 @@ struct PACKED log_PSCZ {
 // @Field: TAZ: Target acceleration Z-axis
 // @Field: AZ: Acceleration Z-axis
 // @Field: ThO: Throttle output
+=======
+#define ACC_LABELS "TimeUS,SampleUS,AccX,AccY,AccZ"
+#define ACC_FMT   "QQfff"
+#define ACC_UNITS "ssnnn"
+#define ACC_MULTS "FF000"
+
+// see "struct sensor" in AP_Baro.h and "Write_Baro":
+#define BARO_LABELS "TimeUS,Alt,Press,GndPress,Temp,CRt,SMS,Offset,GndTemp,Health"
+#define BARO_FMT   "QfffcfIffB"
+#define BARO_UNITS "smPPOnsmO-"
+#define BARO_MULTS "F000B0C?0-"
+
+#define ESC_LABELS "TimeUS,RPM,Volt,Curr,Temp,CTot"
+#define ESC_FMT   "QeCCcH"
+#define ESC_UNITS "sqvAO-"
+#define ESC_MULTS "FBBBB-"
+
+#define GPA_LABELS "TimeUS,VDop,HAcc,VAcc,SAcc,YAcc,VV,SMS,Delta"
+#define GPA_FMT   "QCCCCfBIH"
+#define GPA_UNITS "smmmnd-ss"
+#define GPA_MULTS "FBBBB0-CC"
+
+// see "struct GPS_State" and "Write_GPS":
+#define GPS_LABELS "TimeUS,Status,GMS,GWk,NSats,HDop,Lat,Lng,Alt,Spd,GCrs,VZ,Yaw,U"
+#define GPS_FMT   "QBIHBcLLeffffB"
+#define GPS_UNITS "s---SmDUmnhnh-"
+#define GPS_MULTS "F---0BGGB000--"
+
+#define GYR_LABELS "TimeUS,SampleUS,GyrX,GyrY,GyrZ"
+#define GYR_FMT    "QQfff"
+#define GYR_UNITS  "ssEEE"
+#define GYR_MULTS  "FF000"
+
+#define IMT_LABELS "TimeUS,DelT,DelvT,DelaT,DelAX,DelAY,DelAZ,DelVX,DelVY,DelVZ"
+#define IMT_FMT    "Qfffffffff"
+#define IMT_UNITS  "ssssrrrnnn"
+#define IMT_MULTS  "FF00000000"
+
+#define ISBH_LABELS "TimeUS,N,type,instance,mul,smp_cnt,SampleUS,smp_rate"
+#define ISBH_FMT    "QHBBHHQf"
+#define ISBH_UNITS  "s-----sz"
+#define ISBH_MULTS  "F-----F-"
+
+#define ISBD_LABELS "TimeUS,N,seqno,x,y,z"
+#define ISBD_FMT    "QHHaaa"
+#define ISBD_UNITS  "s--ooo"
+#define ISBD_MULTS  "F--???"
+
+#define IMU_LABELS "TimeUS,GyrX,GyrY,GyrZ,AccX,AccY,AccZ,EG,EA,T,GH,AH,GHz,AHz"
+#define IMU_FMT   "QffffffIIfBBHH"
+#define IMU_UNITS "sEEEooo--O--zz"
+#define IMU_MULTS "F000000-----00"
+
+#define MAG_LABELS "TimeUS,MagX,MagY,MagZ,OfsX,OfsY,OfsZ,MOfsX,MOfsY,MOfsZ,Health,S"
+#define MAG_FMT   "QhhhhhhhhhBI"
+#define MAG_UNITS "sGGGGGGGGG-s"
+#define MAG_MULTS "FCCCCCCCCC-F"
+
+#define PID_LABELS "TimeUS,Tar,Act,Err,P,I,D,FF"
+#define PID_FMT    "Qfffffff"
+#define PID_UNITS  "s-------"
+#define PID_MULTS  "F-------"
+
+#define QUAT_LABELS "TimeUS,Q1,Q2,Q3,Q4"
+#define QUAT_FMT    "Qffff"
+#define QUAT_UNITS  "s????"
+#define QUAT_MULTS  "F????"
+
+#define CURR_LABELS "TimeUS,Volt,VoltR,Curr,CurrTot,EnrgTot,Temp,Res"
+#define CURR_FMT    "Qfffffcf"
+#define CURR_UNITS  "svvA?JOw"
+#define CURR_MULTS  "F000?/?0"
+
+#define CURR_CELL_LABELS "TimeUS,Volt,V1,V2,V3,V4,V5,V6,V7,V8,V9,V10"
+#define CURR_CELL_FMT    "QfHHHHHHHHHH"
+#define CURR_CELL_UNITS  "svvvvvvvvvvv"
+#define CURR_CELL_MULTS  "F00000000000"
+
+#define ARSP_LABELS "TimeUS,Airspeed,DiffPress,Temp,RawPress,Offset,U,Health,Hfp,Pri"
+#define ARSP_FMT "QffcffBBfB"
+#define ARSP_UNITS "snPOPP----"
+#define ARSP_MULTS "F00B00----"
+>>>>>>> feat: Apply patches for ground baro, blend gps, and fixed mro board
 
 // messages for all boards
 #define LOG_BASE_STRUCTURES \
