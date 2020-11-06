@@ -69,7 +69,7 @@
 #else
 #define EK2_POSXY_STATE_LIMIT 1.0e6
 #endif
-    
+
 class AP_AHRS;
 
 class NavEKF2_core : public NavEKF_core_common
