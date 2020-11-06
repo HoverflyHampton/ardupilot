@@ -240,7 +240,7 @@ int16_t RC_Channel::pwm_to_range_dz(uint16_t _dead_zone) const
     if((ch_in == 0 || ch_in == 1) && 
         (radio_in > radio_max.get() || radio_in < radio_min.get()))
     {
-        r_in = (radio_max.get() + radio_min.get()) / 2
+        r_in = (radio_max.get() + radio_min.get()) / 2;
     }
 
     if (reversed) {
