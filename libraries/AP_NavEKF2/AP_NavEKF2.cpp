@@ -602,7 +602,7 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
     // @User: Advanced
     // @Range: 0 200
     // @Units: m
-    AP_GROUPINFO("MAG_FINAL_RESET_ALT", 57, NavEKF3, _mag_final_reset_alt, EKF2_MAG_FINAL_RESET_ALT_DEFAULT),
+    AP_GROUPINFO("MAG_FINAL_RESET_ALT", 57, NavEKF2, _mag_final_reset_alt, EKF2_MAG_FINAL_RESET_ALT_DEFAULT),
 
 
     AP_GROUPEND
