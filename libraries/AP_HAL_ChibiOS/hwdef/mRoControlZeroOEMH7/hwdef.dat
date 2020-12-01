@@ -70,7 +70,7 @@ define HAL_I2C_INTERNAL_MASK 0
 
 # OTG1 and OTG2 are USB devices (1x physical USB connection enumerated as 2x logical ports)
 
-SERIAL_ORDER OTG1 USART2 USART3 UART4 UART8 UART7 OTG2
+UART_ORDER OTG1 USART2 USART3 UART4 UART8 UART7 OTG2
 
 # default the 2nd interface to MAVLink2 until MissionPlanner updates drivers
 define HAL_OTG2_PROTOCOL SerialProtocol_MAVLink2
