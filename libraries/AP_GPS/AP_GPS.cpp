@@ -1022,7 +1022,6 @@ void AP_GPS::update_primary(void)
         return;
     }
 
-
     // Use primary if 3D fix or better
     if (((GPSAutoSwitch)_auto_switch.get() == GPSAutoSwitch::USE_PRIMARY_IF_3D_FIX) && (state[primary_param].status >= GPS_OK_FIX_3D)) {
         // Primary GPS has a least a 3D fix, switch to it if necessary
