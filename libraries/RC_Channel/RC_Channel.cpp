@@ -143,6 +143,13 @@ bool RC_Channel::update(void)
         return false;
     }
 
+    //This feels like the wrong place to do this, but I want to be sure that both angle and range control outputs are fixed
+    if((ch_in == 0 || ch_in == 1) && 
+        (radio_in > radio_max.get() || radio_in < radio_min.get()))
+    {
+        radio_in = (radio_max.get() + radio_min.get()) / 2;
+    }
+
     if (type_in == RC_CHANNEL_TYPE_RANGE) {
         control_in = pwm_to_range();
     } else {
@@ -236,12 +243,6 @@ int16_t RC_Channel::pwm_to_angle() const
 int16_t RC_Channel::pwm_to_range_dz(uint16_t _dead_zone) const
 {
     int16_t r_in = constrain_int16(radio_in, radio_min.get(), radio_max.get());
-    
-    if((ch_in == 0 || ch_in == 1) && 
-        (radio_in > radio_max.get() || radio_in < radio_min.get()))
-    {
-        r_in = (radio_max.get() + radio_min.get()) / 2;
-    }
 
     if (reversed) {
 	    r_in = radio_max.get() - (r_in - radio_min.get());
