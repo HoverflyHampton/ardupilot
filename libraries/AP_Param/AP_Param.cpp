@@ -32,6 +32,7 @@
 #include <GCS_MAVLink/GCS.h>
 #include <StorageManager/StorageManager.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
+#include <AP_InternalError/AP_InternalError.h>
 #include <stdio.h>
 
 extern const AP_HAL::HAL &hal;
@@ -101,6 +102,9 @@ const AP_Param::param_defaults_struct AP_Param::param_defaults_data = {
 // storage object
 StorageAccess AP_Param::_storage(StorageManager::StorageParam);
 
+// backup storage object
+StorageAccess AP_Param::_storage_bak(StorageManager::StorageParamBak);
+
 // flags indicating frame type
 uint16_t AP_Param::_frame_type_flags;
 
@@ -108,6 +112,7 @@ uint16_t AP_Param::_frame_type_flags;
 void AP_Param::eeprom_write_check(const void *ptr, uint16_t ofs, uint8_t size)
 {
     _storage.write_block(ofs, ptr, size);
+    _storage_bak.write_block(ofs, ptr, size);
 }
 
 bool AP_Param::_hide_disabled_groups = true;
@@ -314,18 +319,31 @@ bool AP_Param::check_var_info(void)
 // setup the _var_info[] table
 bool AP_Param::setup(void)
 {
-    struct EEPROM_header hdr;
+    struct EEPROM_header hdr {};
+    struct EEPROM_header hdr2 {};
 
     // check the header
     _storage.read_block(&hdr, 0, sizeof(hdr));
+    _storage_bak.read_block(&hdr2, 0, sizeof(hdr2));
     if (hdr.magic[0] != k_EEPROM_magic0 ||
         hdr.magic[1] != k_EEPROM_magic1 ||
         hdr.revision != k_EEPROM_revision) {
+        if (hdr2.magic[0] == k_EEPROM_magic0 &&
+            hdr2.magic[1] == k_EEPROM_magic1 &&
+            hdr2.revision == k_EEPROM_revision &&
+            _storage.copy_area(_storage_bak)) {
+            // restored from backup
+            INTERNAL_ERROR(AP_InternalError::error_t::params_restored);
+            return true;
+        }
         // header doesn't match. We can't recover any variables. Wipe
         // the header and setup the sentinal directly after the header
         Debug("bad header in setup - erasing");
         erase_all();
     }
+
+    // ensure that backup is in sync with primary
+    _storage_bak.copy_area(_storage);
 
     return true;
 }
@@ -956,6 +974,23 @@ bool AP_Param::find_key_by_pointer(const void *ptr, uint16_t &key)
             continue;
         }
         if (find_key_by_pointer_group(ptr, i, ginfo, offset, key)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/*
+  Find key to top level group parameters by pointer
+*/
+bool AP_Param::find_top_level_key_by_pointer(const void *ptr, uint16_t &key)
+{
+    for (uint16_t i=0; i<_num_vars; i++) {
+        if (_var_info[i].type != AP_PARAM_GROUP) {
+            continue;
+        }
+        if (ptr == (void **)_var_info[i].ptr) {
+            key = _var_info[i].key;
             return true;
         }
     }
@@ -1830,6 +1865,65 @@ void AP_Param::convert_parent_class(uint8_t param_key, void *object_pointer,
         uint8_t *new_value = group_info[i].offset + (uint8_t *)object_pointer;
         memcpy(new_value, old_value, sizeof(old_value));
     }
+}
+
+/*
+ convert width of a parameter, allowing update to wider scalar values
+ without changing the parameter indexes
+*/
+bool AP_Param::convert_parameter_width(ap_var_type old_ptype)
+{
+    if (configured_in_storage()) {
+        // already converted or set by the user
+        return false;
+    }
+
+    uint32_t group_element = 0;
+    const struct GroupInfo *ginfo;
+    struct GroupNesting group_nesting {};
+    uint8_t idx;
+    const struct AP_Param::Info *info = find_var_info(&group_element, ginfo, group_nesting, &idx);
+
+    if (info == nullptr) {
+        return false;
+    }
+
+    // remember the type
+    ap_var_type new_ptype;
+    if (ginfo != nullptr) {
+        new_ptype = (ap_var_type)ginfo->type;
+    } else {
+        new_ptype = (ap_var_type)info->type;
+    }
+    
+    // create the header we will use to scan for the variable
+    struct Param_header phdr;
+    phdr.type = old_ptype;
+    set_key(phdr, info->key);
+    phdr.group_element = group_element;
+
+    // scan EEPROM to find the right location
+    uint16_t pofs;
+    if (!scan(&phdr, &pofs)) {
+        // it isn't in storage
+        return false;
+    }
+
+    // load the old value from EEPROM
+    uint8_t old_value[type_size(old_ptype)];
+    _storage.read_block(old_value, pofs+sizeof(phdr), sizeof(old_value));
+    
+    AP_Param *old_ap = (AP_Param *)&old_value[0];
+
+    // going via float is safe as the only time we would be converting
+    // from AP_Int32 is when converting to float
+    float old_float_value = old_ap->cast_to_float(old_ptype);
+    set_value(new_ptype, this, old_float_value);
+
+    // force save as the new type
+    save(true);
+
+    return true;
 }
 
 

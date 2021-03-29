@@ -173,10 +173,12 @@ void AP_GPS_UAVCAN::handle_fix_msg(const FixCb &cb)
 
         if (cb.msg->gnss_time_standard == uavcan::equipment::gnss::Fix::GNSS_TIME_STANDARD_UTC) {
             uint64_t epoch_ms = uavcan::UtcTime(cb.msg->gnss_timestamp).toUSec();
-            epoch_ms /= 1000;
-            uint64_t gps_ms = epoch_ms - UNIX_OFFSET_MSEC;
-            interim_state.time_week = (uint16_t)(gps_ms / AP_MSEC_PER_WEEK);
-            interim_state.time_week_ms = (uint32_t)(gps_ms - (interim_state.time_week) * AP_MSEC_PER_WEEK);
+            if (epoch_ms != 0) {
+                epoch_ms /= 1000;
+                uint64_t gps_ms = epoch_ms - UNIX_OFFSET_MSEC;
+                interim_state.time_week = (uint16_t)(gps_ms / AP_MSEC_PER_WEEK);
+                interim_state.time_week_ms = (uint32_t)(gps_ms - (interim_state.time_week) * AP_MSEC_PER_WEEK);
+            }
         }
     }
 
@@ -283,10 +285,12 @@ void AP_GPS_UAVCAN::handle_fix2_msg(const Fix2Cb &cb)
 
         if (cb.msg->gnss_time_standard == uavcan::equipment::gnss::Fix2::GNSS_TIME_STANDARD_UTC) {
             uint64_t epoch_ms = uavcan::UtcTime(cb.msg->gnss_timestamp).toUSec();
-            epoch_ms /= 1000;
-            uint64_t gps_ms = epoch_ms - UNIX_OFFSET_MSEC;
-            interim_state.time_week = (uint16_t)(gps_ms / AP_MSEC_PER_WEEK);
-            interim_state.time_week_ms = (uint32_t)(gps_ms - (interim_state.time_week) * AP_MSEC_PER_WEEK);
+            if (epoch_ms != 0) {
+                epoch_ms /= 1000;
+                uint64_t gps_ms = epoch_ms - UNIX_OFFSET_MSEC;
+                interim_state.time_week = (uint16_t)(gps_ms / AP_MSEC_PER_WEEK);
+                interim_state.time_week_ms = (uint32_t)(gps_ms - (interim_state.time_week) * AP_MSEC_PER_WEEK);
+            }
         }
 
         if (interim_state.status == AP_GPS::GPS_Status::GPS_OK_FIX_3D) {
@@ -422,6 +426,12 @@ bool AP_GPS_UAVCAN::read(void)
     WITH_SEMAPHORE(sem);
     if (_new_data) {
         _new_data = false;
+
+        // the encoding of accuracies in UAVCAN can result in infinite
+        // values. These cause problems with blending. Use 1000m and 1000m/s instead
+        interim_state.horizontal_accuracy = MIN(interim_state.horizontal_accuracy, 1000.0);
+        interim_state.vertical_accuracy = MIN(interim_state.vertical_accuracy, 1000.0);
+        interim_state.speed_accuracy = MIN(interim_state.speed_accuracy, 1000.0);
 
         state = interim_state;
 

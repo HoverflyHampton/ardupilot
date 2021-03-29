@@ -48,6 +48,8 @@ void NavEKF3_core::readRangeFinder(void)
                 }
                 storedRngMeasTime_ms[sensorIndex][rngMeasIndex[sensorIndex]] = imuSampleTime_ms - 25;
                 storedRngMeas[sensorIndex][rngMeasIndex[sensorIndex]] = sensor->distance_cm() * 0.01f;
+            } else {
+                continue;
             }
 
             // check for three fresh samples
@@ -543,6 +545,7 @@ void NavEKF3_core::readGpsData()
             } else {
                 gpsSpdAccuracy = MAX(gpsSpdAccuracy,gpsSpdAccRaw);
                 gpsSpdAccuracy = MIN(gpsSpdAccuracy,50.0f);
+                gpsSpdAccuracy = MAX(gpsSpdAccuracy,frontend->_gpsHorizVelNoise);
             }
             gpsPosAccuracy *= (1.0f - alpha);
             float gpsPosAccRaw;
@@ -551,6 +554,7 @@ void NavEKF3_core::readGpsData()
             } else {
                 gpsPosAccuracy = MAX(gpsPosAccuracy,gpsPosAccRaw);
                 gpsPosAccuracy = MIN(gpsPosAccuracy,100.0f);
+                gpsPosAccuracy = MAX(gpsPosAccuracy, frontend->_gpsHorizPosNoise);
             }
             gpsHgtAccuracy *= (1.0f - alpha);
             float gpsHgtAccRaw;
@@ -559,6 +563,7 @@ void NavEKF3_core::readGpsData()
             } else {
                 gpsHgtAccuracy = MAX(gpsHgtAccuracy,gpsHgtAccRaw);
                 gpsHgtAccuracy = MIN(gpsHgtAccuracy,100.0f);
+                gpsHgtAccuracy = MAX(gpsHgtAccuracy, 1.5f * frontend->_gpsHorizPosNoise);
             }
 
             // check if we have enough GPS satellites and increase the gps noise scaler if we don't
@@ -609,7 +614,7 @@ void NavEKF3_core::readGpsData()
 
             if (gpsGoodToAlign && !have_table_earth_field) {
                 const Compass *compass = _ahrs->get_compass();
-                if (compass && compass->have_scale_factor(magSelectIndex)) {
+                if (compass && compass->have_scale_factor(magSelectIndex) && compass->auto_declination_enabled()) {
                     table_earth_field_ga = AP_Declination::get_earth_field_ga(gpsloc);
                     table_declination = radians(AP_Declination::get_declination(gpsloc.lat*1.0e-7,
                                                                             gpsloc.lng*1.0e-7));
@@ -768,8 +773,8 @@ void NavEKF3_core::readAirSpdData()
     // know a new measurement is available
     const AP_Airspeed *aspeed = _ahrs->get_airspeed();
     if (aspeed &&
-            aspeed->use() &&
-            (aspeed->last_update_ms() - timeTasReceived_ms) > frontend->sensorIntervalMin_ms) {
+        aspeed->use() && aspeed->healthy() &&
+        (aspeed->last_update_ms() - timeTasReceived_ms) > frontend->sensorIntervalMin_ms) {
         tasDataNew.tas = aspeed->get_raw_airspeed() * AP::ahrs().get_EAS2TAS();
         timeTasReceived_ms = aspeed->last_update_ms();
         tasDataNew.time_ms = timeTasReceived_ms - frontend->tasDelay_ms;
