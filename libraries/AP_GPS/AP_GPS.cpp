@@ -934,7 +934,7 @@ void AP_GPS::update_primary(void)
         if (i == primary_instance) {
             continue;
         }
-        if (state[i].status > state[primary_instance].status) {
+        if (state[primary_instance].status < 3 && state[i].status > state[primary_instance].status) {
             // we have a higher status lock, or primary is set to the blended GPS, change GPS
             primary_instance = i;
             _last_instance_swap_ms = now;
