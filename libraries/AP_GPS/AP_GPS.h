@@ -476,6 +476,11 @@ public:
         return instance>=GPS_MAX_RECEIVERS? GPS_Type::GPS_TYPE_NONE : GPS_Type(_type[instance].get());
     }
 
+    void set_gps_lock(bool gps_switch) { disable_gps_switch = gps_switch;};
+    bool gps_switch_disabled() { return disable_gps_switch;};
+
+    int get_lock_altitude(){return _lock_alt;};
+
 protected:
 
     // configuration parameters
@@ -498,6 +503,7 @@ protected:
     AP_Int8 _blend_mask;
     AP_Float _blend_tc;
     AP_Int16 _driver_options;
+    AP_Int16 _lock_alt;
 
     uint32_t _log_gps_bit = -1;
 
@@ -632,6 +638,10 @@ private:
 
     // used to ensure we continue sending status messages if we ever detected the second GPS
     bool has_had_second_instance;
+
+    // used to lock in gps when in use best and landing
+    bool disable_gps_switch;
+    
 };
 
 namespace AP {

@@ -299,6 +299,14 @@ const AP_Param::GroupInfo AP_GPS::var_info[] = {
     AP_GROUPINFO("DRV_OPTIONS", 22, AP_GPS, _driver_options, 0),
 #endif
 
+    // @Param: LOCK_ALT
+    // @DisplayName: Altitude in meters to lock in to a single GPS
+    // @Description: Controls the altitude at which the GPS stops switching between best and locks to a single GPS. Used to smooth out landing and takeoff
+    // @Units: cm
+    // @Range: 50 1500
+    // @User: Advanced
+    AP_GROUPINFO("LOCK_ALT", 23, AP_GPS, _lock_alt, 1000),
+
     AP_GROUPEND
 };
 
@@ -930,32 +938,35 @@ void AP_GPS::update_primary(void)
     }
 
     // handle switch between real GPSs
-    for (uint8_t i=0; i<GPS_MAX_RECEIVERS; i++) {
-        if (i == primary_instance) {
-            continue;
-        }
-        if (state[primary_instance].status < 3 && state[i].status > state[primary_instance].status) {
-            // we have a higher status lock, or primary is set to the blended GPS, change GPS
-            primary_instance = i;
-            _last_instance_swap_ms = now;
-            continue;
-        }
-
-        bool another_gps_has_1_or_more_sats = (state[i].num_sats >= state[primary_instance].num_sats + 1);
-
-        if (state[i].status == state[primary_instance].status && another_gps_has_1_or_more_sats) {
-
-            bool another_gps_has_2_or_more_sats = (state[i].num_sats >= state[primary_instance].num_sats + 2);
-
-            if ((another_gps_has_1_or_more_sats && (now - _last_instance_swap_ms) >= 20000) ||
-                (another_gps_has_2_or_more_sats && (now - _last_instance_swap_ms) >= 5000)) {
-                // this GPS has more satellites than the
-                // current primary, switch primary. Once we switch we will
-                // then tend to stick to the new GPS as primary. We don't
-                // want to switch too often as it will look like a
-                // position shift to the controllers.
+    //first, check if we are locked into a single gps
+    if(!gps_switch_disabled()){
+        for (uint8_t i=0; i<GPS_MAX_RECEIVERS; i++) {
+            if (i == primary_instance) {
+                continue;
+            }
+            if (state[primary_instance].status < 3 && state[i].status > state[primary_instance].status) {
+                // we have a higher status lock, or primary is set to the blended GPS, change GPS
                 primary_instance = i;
                 _last_instance_swap_ms = now;
+                continue;
+            }
+
+            bool another_gps_has_1_or_more_sats = (state[i].num_sats >= state[primary_instance].num_sats + 1);
+
+            if (state[i].status == state[primary_instance].status && another_gps_has_1_or_more_sats) {
+
+                bool another_gps_has_2_or_more_sats = (state[i].num_sats >= state[primary_instance].num_sats + 2);
+
+                if ((another_gps_has_1_or_more_sats && (now - _last_instance_swap_ms) >= 20000) ||
+                    (another_gps_has_2_or_more_sats && (now - _last_instance_swap_ms) >= 5000)) {
+                    // this GPS has more satellites than the
+                    // current primary, switch primary. Once we switch we will
+                    // then tend to stick to the new GPS as primary. We don't
+                    // want to switch too often as it will look like a
+                    // position shift to the controllers.
+                    primary_instance = i;
+                    _last_instance_swap_ms = now;
+                }
             }
         }
     }

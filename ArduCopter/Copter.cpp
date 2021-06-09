@@ -474,6 +474,12 @@ void Copter::update_GPS(void)
     static uint32_t last_gps_reading[GPS_MAX_INSTANCES];   // time of last gps message
     bool gps_updated = false;
 
+    if(baro_alt < gps.get_lock_altitude()){
+        gps.set_gps_lock(true);
+    }
+    else{
+        gps.set_gps_lock(false);
+    }
     gps.update();
 
     // log after every gps message
