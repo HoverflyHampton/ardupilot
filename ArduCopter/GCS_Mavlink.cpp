@@ -72,6 +72,12 @@ uint32_t GCS_Copter::custom_mode() const
     return (uint32_t)copter.control_mode;
 }
 
+float GCS_COPTER::get_landing_target_acquired() const
+{
+    return 
+}
+
+
 MAV_STATE GCS_MAVLINK_Copter::vehicle_system_status() const
 {
     // set system as critical if any failsafe have triggered
@@ -1274,6 +1280,7 @@ void Copter::mavlink_delay_cb()
         last_1hz = tnow;
         gcs().send_message(MSG_HEARTBEAT);
         gcs().send_message(MSG_SYS_STATUS);
+        gcs().send_message(MSG_PL_ACQUIRED);
     }
     if (tnow - last_50hz > 20) {
         last_50hz = tnow;

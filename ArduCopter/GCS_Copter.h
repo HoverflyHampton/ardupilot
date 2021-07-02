@@ -28,6 +28,8 @@ public:
     void update_vehicle_sensor_status_flags(void) override;
 
     uint32_t custom_mode() const override;
+    float get_landing_target_acquired() const override;
+
     MAV_TYPE frame_type() const override;
 
     const char* frame_string() const override;

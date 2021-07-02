@@ -2445,6 +2445,20 @@ void GCS_MAVLINK::send_accelcal_vehicle_position(uint32_t position)
     }
 }
 
+void GCS_MAVLINK::send_precision_landing_target_acquired()
+{
+    if (HAVE_PAYLOAD_SPACE(chan, COMMAND_LONG)) {
+        mavlink_msg_command_long_send(
+            chan,
+            0,
+            0,
+            MAV_CMD_PL_TARGET_ACQ,
+            0,
+            (float) gcs().get_landing_target_acquired(),
+            0, 0, 0, 0, 0, 0);
+    }
+}
+
 
 float GCS_MAVLINK::vfr_hud_airspeed() const
 {
@@ -4486,6 +4500,11 @@ bool GCS_MAVLINK::try_send_message(const enum ap_message id)
     case MSG_AUTOPILOT_VERSION:
         CHECK_PAYLOAD_SIZE(AUTOPILOT_VERSION);
         send_autopilot_version();
+        break;
+
+    case MSG_PL_ACQUIRED:
+        CHECK_PAYLOAD_SIZE(COMMAND_LONG);
+        send_precision_landing_target_acquired();
         break;
 
     case MSG_ESC_TELEMETRY: {
