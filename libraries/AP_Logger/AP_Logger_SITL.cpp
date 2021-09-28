@@ -84,6 +84,11 @@ void AP_Logger_SITL::Sector4kErase(uint32_t SectorAdr)
     }
 }
 
+void AP_Logger_SITL::Sector4kErase(uint32_t SectorAdr)
+{
+    SectorErase(SectorAdr);
+}
+
 void AP_Logger_SITL::StartErase()
 {
     for (uint32_t i=0; i<DF_NUM_PAGES/DF_PAGE_PER_BLOCK; i++) {

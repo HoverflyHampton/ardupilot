@@ -377,6 +377,15 @@ const AP_Param::GroupInfo AP_GPS::var_info[] = {
     AP_GROUPINFO("2_CAN_OVRIDE", 31, AP_GPS, _override_node_id[1], 0),
 #endif
 
+#if GPS_UBLOX_MOVING_BASELINE
+    // @Param: DRV_OPTIONS
+    // @DisplayName: driver options
+    // @Description: Additional backend specific options
+    // @Bitmask: 0:Use UART2 for moving baseline on ublox
+    // @User: Advanced
+    AP_GROUPINFO("DRV_OPTIONS", 22, AP_GPS, _driver_options, 0),
+#endif
+
     AP_GROUPEND
 };
 
@@ -673,7 +682,6 @@ void AP_GPS::detect_instance(uint8_t instance)
           the uBlox into 230400 no matter what rate it is configured
           for.
         */
-
         if ((_type[instance] == GPS_TYPE_AUTO ||
              _type[instance] == GPS_TYPE_UBLOX) &&
             ((!_auto_config && _baudrates[dstate->current_baud] >= 38400) ||
@@ -744,6 +752,9 @@ found_gps:
         timing[instance].last_message_time_ms = now;
         timing[instance].delta_time_ms = GPS_TIMEOUT_MS;
         new_gps->broadcast_gps_type();
+        if (instance == 1) {
+            has_had_second_instance = true;
+        }
     }
 }
 
@@ -1509,6 +1520,11 @@ bool AP_GPS::calc_blend_weights(void)
             min_ms = state[i].last_gps_time_ms;
         }
         max_rate_ms = MAX(get_rate_ms(i), max_rate_ms);
+        if (isinf(state[i].speed_accuracy) ||
+            isinf(state[i].horizontal_accuracy) ||
+            isinf(state[i].vertical_accuracy)) {
+            return false;
+        }
         if (isinf(state[i].speed_accuracy) ||
             isinf(state[i].horizontal_accuracy) ||
             isinf(state[i].vertical_accuracy)) {

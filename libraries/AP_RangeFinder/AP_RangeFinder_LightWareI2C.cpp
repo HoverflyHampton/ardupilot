@@ -25,6 +25,8 @@ extern const AP_HAL::HAL& hal;
 
 #define LIGHTWARE_OUT_OF_RANGE_ADD_CM   100
 
+#define LIGHTWARE_OUT_OF_RANGE_ADD_CM   100
+
 static const size_t lx20_max_reply_len_bytes = 32;
 static const size_t lx20_max_expected_stream_reply_len_bytes = 14;
 

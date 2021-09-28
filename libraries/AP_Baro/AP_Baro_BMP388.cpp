@@ -238,3 +238,24 @@ bool AP_Baro_BMP388::read_registers(uint8_t reg, uint8_t *data, uint8_t len)
     memcpy(data, &b[2], len);
     return true;
 }
+
+/*
+  read registers, special SPI handling needed
+*/
+bool AP_Baro_BMP388::read_registers(uint8_t reg, uint8_t *data, uint8_t len)
+{
+    // when on I2C we just read normally
+    if (dev->bus_type() != AP_HAL::Device::BUS_TYPE_SPI) {
+        return dev->read_registers(reg, data, len);
+    }
+    // for SPI we need to discard the first returned byte. See
+    // datasheet for explanation
+    uint8_t b[len+2];
+    b[0] = reg | 0x80;
+    memset(&b[1], 0, len+1);
+    if (!dev->transfer(b, len+2, b, len+2)) {
+        return false;
+    }
+    memcpy(data, &b[2], len);
+    return true;
+}

@@ -1186,6 +1186,9 @@ void Copter::load_parameters(void)
     // convert fs_options parameters
     convert_fs_options_params();
 
+    // convert fs_options parameters
+    convert_fs_options_params();
+
     hal.console->printf("load_all took %uus\n", (unsigned)(micros() - before));
 
     // setup AP_Param frame type flags

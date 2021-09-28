@@ -113,6 +113,12 @@ private:
         CONFIG_420000_8N1 = 3,
     };
 
+    enum config_phase {
+        CONFIG_115200_8N1 = 0,
+        CONFIG_115200_8N1I = 1,
+        CONFIG_100000_8E2I = 2,
+    };
+
     // optional additional uart
     struct {
         AP_HAL::UARTDriver *uart;

@@ -45,6 +45,12 @@
 // a variant with 460800 baudrate
 #define UBLOX_SET_BINARY_460800 "\265\142\006\001\003\000\001\006\001\022\117$PUBX,41,1,0023,0001,460800,0*11\r\n"
 
+// a varient with 230400 baudrate
+#define UBLOX_SET_BINARY_230400 "\265\142\006\001\003\000\001\006\001\022\117$PUBX,41,1,0023,0001,230400,0*1E\r\n"
+
+// a varient with 460800 baudrate
+#define UBLOX_SET_BINARY_460800 "\265\142\006\001\003\000\001\006\001\022\117$PUBX,41,1,0023,0001,460800,0*11\r\n"
+
 #define UBLOX_RXM_RAW_LOGGING 1
 #define UBLOX_MAX_RXM_RAW_SATS 22
 #define UBLOX_MAX_RXM_RAWX_SATS 32
@@ -656,6 +662,11 @@ private:
         STEP_VERSION,
         STEP_RTK_MOVBASE, // setup moving baseline
         STEP_LAST
+    };
+
+    // GPS_DRV_OPTIONS bits
+    enum class DRV_OPTIONS {
+        MB_USE_UART2 = 1U<<0,
     };
 
     // Packet checksum accumulators

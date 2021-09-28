@@ -150,6 +150,17 @@ float Copter::get_pilot_desired_rotor_speed() const
     return 0.0f;
 }
 
+// convert motor interlock switch's position to desired rotor speed expressed as a value from 0 to 1
+// returns zero if motor interlock auxiliary switch hasn't been defined
+float Copter::get_pilot_desired_rotor_speed() const
+{
+    RC_Channel *rc_ptr = rc().find_channel_for_option(RC_Channel::AUX_FUNC::MOTOR_INTERLOCK);
+    if (rc_ptr != nullptr) {
+        return (float)rc_ptr->get_control_in() * 0.001f;
+    }
+    return 0.0f;
+}
+
 // heli_update_rotor_speed_targets - reads pilot input and passes new rotor speed targets to heli motors object
 void Copter::heli_update_rotor_speed_targets()
 {

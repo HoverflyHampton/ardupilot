@@ -330,7 +330,6 @@ bool Scheduler::thread_create(AP_HAL::MemberProc proc, const char *name, uint32_
     a->stack_size = stack_size;
     a->f[0] = proc;
     a->name = name;
-
     if (pthread_attr_init(&a->attr) != 0) {
         goto failed;
     }

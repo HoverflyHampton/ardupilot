@@ -372,6 +372,12 @@ void AP_OADatabase::send_adsb_vehicle(mavlink_channel_t chan, uint16_t interval_
         return;
     }
 
+    // use vehicle's current altitude
+    Location current_loc;
+    if (!AP::ahrs().get_position(current_loc)) {
+        current_loc.alt = 0;
+    }
+
     const uint8_t chan_as_bitmask = 1 << chan;
     const char callsign[9] = "OA_DB";
 

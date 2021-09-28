@@ -21,6 +21,9 @@ void NavEKF3_core::ResetVelocity(resetDataSource velResetSource)
     zeroRows(P,4,5);
     zeroCols(P,4,5);
 
+    gps_elements gps_corrected = gpsDataNew;
+    CorrectGPSForAntennaOffset(gps_corrected);
+
     if (PV_AidingMode != AID_ABSOLUTE) {
         stateStruct.velocity.zero();
         // set the variances using the measurement noise parameter
@@ -88,6 +91,9 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
         // set the variances using the position measurement noise parameter
         P[7][7] = P[8][8] = sq(frontend->_gpsHorizPosNoise);
     } else  {
+        gps_elements gps_corrected = gpsDataNew;
+        CorrectGPSForAntennaOffset(gps_corrected);
+
         // Use GPS data as first preference if fresh data is available
         if ((imuSampleTime_ms - lastTimeGpsReceived_ms < 250 && posResetSource == resetDataSource::DEFAULT) || posResetSource == resetDataSource::GPS) {
             // correct for antenna position

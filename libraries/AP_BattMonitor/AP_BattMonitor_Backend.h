@@ -52,6 +52,9 @@ public:
     // return true if cycle count can be provided and fills in cycles argument
     virtual bool get_cycle_count(uint16_t &cycles) const { return false; }
 
+    // return true if cycle count can be provided and fills in cycles argument
+    virtual bool get_cycle_count(uint16_t &cycles) const { return false; }
+
     /// get voltage with sag removed (based on battery current draw and resistance)
     /// this will always be greater than or equal to the raw voltage
     float voltage_resting_estimate() const;

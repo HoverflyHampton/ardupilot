@@ -134,6 +134,7 @@ def get_mcu_lib(mcu):
     except ImportError:
         error("Unable to find module for MCU %s" % mcu)
 
+
 def setup_mcu_type_defaults():
     '''setup defaults for given mcu type'''
     global pincount, ports, portmap, vtypes, mcu_type
@@ -150,6 +151,7 @@ def setup_mcu_type_defaults():
         portmap[port] = []
         for pin in range(pincount[port]):
             portmap[port].append(generic_pin(port, pin, None, default_gpio[0], default_gpio[1:]))
+
 
 
 def get_alt_function(mcu, pin, function):
@@ -655,6 +657,7 @@ def enable_can(f):
     if 'CAN' in bytype and mcu_type.startswith("STM32F3"):
         f.write('#define CAN1_BASE CAN_BASE\n')
     env_vars['HAL_NUM_CAN_IFACES'] = str(len(base_list))
+
 
 
 def has_sdcard_spi():
@@ -1211,6 +1214,7 @@ def write_UART_config(f):
     devnames = "ABCDEFGHI"
     sdev = 0
     idx = 0
+    num_empty_uarts = 0
     for dev in uart_list:
         if dev == 'EMPTY':
             f.write('#define HAL_UART%s_DRIVER Empty::UARTDriver uart%sDriver\n' %
@@ -1703,6 +1707,7 @@ def add_bootloader():
         env_vars['BOOTLOADER_EMBED'] = 1
     else:
         env_vars['BOOTLOADER_EMBED'] = 0
+
 
 
 

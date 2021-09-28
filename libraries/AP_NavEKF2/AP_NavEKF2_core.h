@@ -54,22 +54,6 @@
 // target EKF update time step
 #define EKF_TARGET_DT 0.01f
 
-// mag fusion final reset altitude
-#define EKF2_MAG_FINAL_RESET_ALT 2.5f
-
-// maximum number of yaw resets due to detected magnetic anomaly allowed per flight
-#define MAG_ANOMALY_RESET_MAX 2
-
-// number of seconds a request to reset the yaw to the GSF estimate is active before it times out
-#define YAW_RESET_TO_GSF_TIMEOUT_MS 5000
-
-// limit on horizontal position states
-#if HAL_WITH_EKF_DOUBLE
-#define EK2_POSXY_STATE_LIMIT 50.0e6
-#else
-#define EK2_POSXY_STATE_LIMIT 1.0e6
-#endif
-    
 class AP_AHRS;
 
 class NavEKF2_core : public NavEKF_core_common

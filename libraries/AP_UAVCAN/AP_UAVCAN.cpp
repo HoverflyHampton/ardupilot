@@ -137,6 +137,14 @@ static uavcan::Subscriber<uavcan::equipment::esc::Status, ESCStatusCb> *esc_stat
 UC_REGISTRY_BINDER(DebugCb, uavcan::protocol::debug::LogMessage);
 static uavcan::Subscriber<uavcan::protocol::debug::LogMessage, DebugCb> *debug_listener[HAL_MAX_CAN_PROTOCOL_DRIVERS];
 
+// handler actuator status
+UC_REGISTRY_BINDER(ActuatorStatusCb, uavcan::equipment::actuator::Status);
+static uavcan::Subscriber<uavcan::equipment::actuator::Status, ActuatorStatusCb> *actuator_status_listener[MAX_NUMBER_OF_CAN_DRIVERS];
+
+// handler ESC status
+UC_REGISTRY_BINDER(ESCStatusCb, uavcan::equipment::esc::Status);
+static uavcan::Subscriber<uavcan::equipment::esc::Status, ESCStatusCb> *esc_status_listener[MAX_NUMBER_OF_CAN_DRIVERS];
+
 
 AP_UAVCAN::AP_UAVCAN() :
     _node_allocator()
@@ -662,6 +670,23 @@ void AP_UAVCAN::safety_state_send()
                                                       uavcan::equipment::safety::ArmingStatus::STATUS_DISARMED;
         arming_status[_driver_index]->broadcast(arming_msg);
     }
+}
+
+/*
+ send RTCMStream packet on all active UAVCAN drivers
+*/
+void AP_UAVCAN::send_RTCMStream(const uint8_t *data, uint32_t len)
+{
+    WITH_SEMAPHORE(_rtcm_stream.sem);
+    if (_rtcm_stream.buf == nullptr) {
+        // give enough space for a full round from a NTRIP server with all
+        // constellations
+        _rtcm_stream.buf = new ByteBuffer(2400);
+    }
+    if (_rtcm_stream.buf == nullptr) {
+        return;
+    }
+    _rtcm_stream.buf->write(data, len);
 }
 
 /*

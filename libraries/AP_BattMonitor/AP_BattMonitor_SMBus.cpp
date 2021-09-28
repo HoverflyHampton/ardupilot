@@ -18,6 +18,8 @@ void AP_BattMonitor_SMBus::init(void)
     if (_dev) {
         timer_handle = _dev->register_periodic_callback(100000, FUNCTOR_BIND_MEMBER(&AP_BattMonitor_SMBus::timer, void));
     }
+    cycles = _cycle_count;
+    return true;
 }
 
 // return true if cycle count can be provided and fills in cycles argument

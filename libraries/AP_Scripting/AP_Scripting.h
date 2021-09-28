@@ -95,6 +95,8 @@ private:
 
     bool _init_failed;  // true if memory allocation failed
 
+    bool _init_failed;  // true if memory allocation failed
+
     static AP_Scripting *_singleton;
 
 };

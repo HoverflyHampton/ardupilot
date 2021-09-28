@@ -95,6 +95,9 @@ public:
     /// check for a change in the radius params
     void check_param_change();
 
+    /// true if pilot control of radius and turn rate is enabled
+    bool pilot_control_enabled() const { return _control > 0; }
+
     static const struct AP_Param::GroupInfo var_info[];
 
 private:

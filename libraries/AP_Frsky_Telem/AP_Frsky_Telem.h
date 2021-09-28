@@ -22,7 +22,9 @@ class AP_Frsky_Parameters;
 class AP_Frsky_Telem {
 
 public:
-    AP_Frsky_Telem();
+    AP_Frsky_Telem(bool external_data=false);
+
+    ~AP_Frsky_Telem();
 
     ~AP_Frsky_Telem();
 

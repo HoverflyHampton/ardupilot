@@ -521,6 +521,13 @@ void Copter::twentyfive_hz_logging()
         g2.arot.Log_Write_Autorotation();
     }
 #endif
+
+#if MODE_AUTOROTATE_ENABLED == ENABLED
+    if (should_log(MASK_LOG_ATTITUDE_MED) || should_log(MASK_LOG_ATTITUDE_FAST)) {
+        //update autorotation log
+        g2.arot.Log_Write_Autorotation();
+    }
+#endif
 }
 
 // three_hz_loop - 3.3hz loop

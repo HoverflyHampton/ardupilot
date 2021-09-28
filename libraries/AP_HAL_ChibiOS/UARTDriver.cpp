@@ -332,6 +332,12 @@ void UARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS)
     } else {
         _cr1_options |= USART_CR1_FIFOEN;
     }
+    if (half_duplex) {
+        rx_dma_enabled = tx_dma_enabled = false;
+    } else {
+        rx_dma_enabled = rx_bounce_buf[0] != nullptr && rx_bounce_buf[1] != nullptr;
+        tx_dma_enabled = tx_bounce_buf != nullptr;
+    }
 #endif
 
     /*
@@ -1162,6 +1168,20 @@ void UARTDriver::_rx_timer_tick(void)
     }
 
     _in_rx_timer = true;
+
+#ifdef HAVE_USB_SERIAL
+    if (hd_tx_active && (chEvtGetAndClearFlags(&hd_listener) & CHN_OUTPUT_EMPTY) != 0) {
+        /*
+          half-duplex transmit has finished. We now re-enable the
+          HDSEL bit for receive
+         */
+        SerialDriver *sd = (SerialDriver*)(sdef.serial);
+        sdStop(sd);
+        sercfg.cr3 |= USART_CR3_HDSEL;
+        sdStart(sd, &sercfg);
+        hd_tx_active = false;
+    }
+#endif
 
 #ifndef HAL_UART_NODMA
     if (rx_dma_enabled && rxdma) {

@@ -67,6 +67,9 @@ I2CBus I2CDeviceManager::businfo[ARRAY_SIZE(I2CD)];
 #define HAL_I2C_H7_400_TIMINGR 0x00300F38
 #endif
 
+#define HAL_I2C_H7_100_TIMINGR 0x00707CBB
+#define HAL_I2C_H7_400_TIMINGR 0x00300F38
+
 /*
   enable clear (toggling SCL) on I2C bus timeouts which leave SDA stuck low
  */

@@ -106,6 +106,9 @@ public:
     // copy from one storage area to another
     bool copy_area(const StorageAccess &source) const;
 
+    // copy from one storage area to another
+    bool copy_area(const StorageAccess &source);
+
 private:
     const StorageManager::StorageType type;
     uint16_t total_size;

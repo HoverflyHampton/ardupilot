@@ -624,6 +624,18 @@ private:
     void _set_profiled_clock(pwm_group *grp, uint8_t idx, uint8_t led);
     void _set_profiled_blank_frame(pwm_group *grp, uint8_t idx, uint8_t led);
 
+    /*
+      setup neopixel (WS2812B) output data for a given output channel
+     */
+    void _set_neopixel_rgb_data(pwm_group *grp, uint8_t idx, uint8_t led, uint8_t red, uint8_t green, uint8_t blue);
+
+    /*
+      setup ProfiLED output data for a given output channel
+     */
+    void _set_profiled_rgb_data(pwm_group *grp, uint8_t idx, uint8_t led, uint8_t red, uint8_t green, uint8_t blue);
+    void _set_profiled_clock(pwm_group *grp, uint8_t idx, uint8_t led);
+    void _set_profiled_blank_frame(pwm_group *grp, uint8_t idx, uint8_t led);
+
     // serial output support
     bool serial_write_byte(uint8_t b);
     bool serial_read_byte(uint8_t &b);

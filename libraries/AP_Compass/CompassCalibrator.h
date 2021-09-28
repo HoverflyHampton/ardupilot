@@ -91,6 +91,10 @@ public:
     // Get current Calibration state
     const State get_state();
 
+    // get completion mask for mavlink reporting (a bitmask of faces/directions for which we have compass samples)
+    typedef uint8_t completion_mask_t[10];
+    const completion_mask_t& get_completion_mask() const { return _completion_mask; }
+
 private:
 
     // results

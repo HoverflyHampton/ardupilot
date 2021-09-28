@@ -2277,6 +2277,12 @@ void RCOutput::set_serial_led_rgb_data(const uint16_t chan, int8_t led, uint8_t 
                 grp->serial_nleds = 0;
                 return;
             }
+
+            break;
+        }
+
+        default: {
+            return;
         }
 
         // at this point the group led data is all setup but the dma buffer still needs to be resized

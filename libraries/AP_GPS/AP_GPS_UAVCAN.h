@@ -60,6 +60,8 @@ public:
 
     bool get_error_codes(uint32_t &error_codes) const override { error_codes = error_code; return seen_status; };
 
+    void inject_data(const uint8_t *data, uint16_t len) override;
+
 private:
     void handle_fix_msg(const FixCb &cb);
     void handle_fix2_msg(const Fix2Cb &cb);

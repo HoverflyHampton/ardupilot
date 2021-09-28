@@ -35,6 +35,8 @@
 
 extern const AP_HAL::HAL& hal;
 
+extern const AP_HAL::HAL& hal;
+
 void AP_RCProtocol::init()
 {
     backend[AP_RCProtocol::PPM] = new AP_RCProtocol_PPMSum(*this);

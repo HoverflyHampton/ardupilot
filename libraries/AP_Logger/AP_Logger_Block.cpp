@@ -279,7 +279,6 @@ void AP_Logger_Block::EraseAll()
     }
 
     WITH_SEMAPHORE(sem);
-
     if (erase_started) {
         // already erasing
         return;
@@ -350,6 +349,7 @@ void AP_Logger_Block::periodic_10Hz(const uint32_t now)
     if (new_log_pending) {
         start_new_log();
     }
+    validate_log_structure();
 }
 
 /*
@@ -836,6 +836,8 @@ void AP_Logger_Block::io_timer(void)
     if (!_initialised || tnow < 2000) {
         return;
     }
+
+    WITH_SEMAPHORE(sem);
 
     if (erase_started) {
         WITH_SEMAPHORE(sem);

@@ -181,6 +181,47 @@ class AutoTestCopter(AutoTest):
 
     def hover(self, hover_throttle=1500):
         self.set_rc(3, hover_throttle)
+    
+    #Climb/descend to a given altitude
+    def setAlt(self, desiredAlt=50):
+        pos = self.mav.location(relative_alt=True)
+        if pos.alt > desiredAlt:
+            self.set_rc(3, 1300)
+            self.wait_altitude((desiredAlt-5), desiredAlt, relative=True)
+        if pos.alt < (desiredAlt-5):
+            self.set_rc(3, 1800)
+            self.wait_altitude((desiredAlt-5), desiredAlt, relative=True)
+        self.hover()
+    
+    # Takeoff, climb to given altitude, and fly east for 10 seconds
+    def takeoffAndMoveAway(self, dAlt=50, dDist=50):
+        self.progress("Centering sticks")
+        self.set_rc(1, 1500)
+        self.set_rc(2, 1500)
+        self.set_rc(3, 1000)
+        self.set_rc(4, 1500)
+        self.takeoff(alt_min=dAlt)
+        self.change_mode("ALT_HOLD")
+
+        self.progress("Yaw to east")
+        self.set_rc(4, 1580)
+        self.wait_heading(90)
+        self.set_rc(4, 1500)
+
+        self.progress("Fly eastbound away from home")
+        self.set_rc(2, 1800)
+        self.wait_seconds(10)
+        self.set_rc(2, 1500)
+        self.hover()
+        self.progress("Cotper staging 50 meters east of home at 50 meters altitude In mode Alt Hold")
+
+    # Start and stop the GCS heartbeat for GCS failsafe testing
+    def setHearbeat(self, beating=True):
+        if beating == False:
+            self.mavproxy.send('set heartbeat 0\n')
+        else:
+            self.mavproxy.send('set heartbeat 1\n')
+        
 
     # Climb/descend to a given altitude
     def setAlt(self, desiredAlt=50):

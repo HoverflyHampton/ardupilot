@@ -135,6 +135,12 @@ void AP_LandingGear::deploy()
         gcs().send_text(MAV_SEVERITY_INFO, "LandingGear: DEPLOY");
     }
 
+    // send message only if output has been configured
+    if (!_deployed &&
+        SRV_Channels::function_assigned(SRV_Channel::k_landing_gear_control)) {
+        gcs().send_text(MAV_SEVERITY_INFO, "LandingGear: DEPLOY");
+    }
+
     // set deployed flag
     _deployed = true;
     _have_changed = true;

@@ -164,6 +164,9 @@ void AC_WPNav::wp_and_spline_init(float speed_cms)
     _wp_desired_speed_xy_cms = is_positive(speed_cms) ? speed_cms : _wp_speed_cms;
     _wp_desired_speed_xy_cms = MAX(_wp_desired_speed_xy_cms, WPNAV_WP_SPEED_MIN);
 
+    // initialize the desired wp speed if not already done
+    _wp_desired_speed_xy_cms = _wp_speed_cms;
+
     // initialise position controller speed and acceleration
     _pos_control.set_max_speed_accel_xy(_wp_desired_speed_xy_cms, _wp_accel_cmss);
     _pos_control.set_correction_speed_accel_xy(_wp_desired_speed_xy_cms, _wp_accel_cmss);
@@ -579,6 +582,9 @@ bool AC_WPNav::update_wpnav()
         _last_wp_speed_cms = _wp_speed_cms;
     }
 
+    // wp_speed_update - update _pos_control.set_max_speed_xy if speed change has been requested
+    wp_speed_update(dt);
+
     // advance the target if necessary
     if (!advance_wp_target_along_track(_pos_control.get_dt())) {
         // To-Do: handle inability to advance along track (probably because of missing terrain data)
@@ -869,4 +875,34 @@ void AC_WPNav::calc_scurve_jerk_and_jerk_time()
         _scurve_jerk_time = MAX(_attitude_control.get_input_tc(), 0.1f);
     }
     _scurve_jerk_time *= 2.0f;
+}
+
+/// wp_speed_update - calculates how to handle speed change requests
+void AC_WPNav::wp_speed_update(float dt)
+{
+    // return if speed has not changed
+    float curr_max_speed_xy_cms = _pos_control.get_max_speed_xy();
+    if (is_equal(_wp_desired_speed_xy_cms, curr_max_speed_xy_cms)) {
+        return;
+    }
+    // calculate speed change
+    if (_wp_desired_speed_xy_cms > curr_max_speed_xy_cms) {
+        // speed up is requested so increase speed within limit set by WPNAV_ACCEL
+        curr_max_speed_xy_cms += _wp_accel_cmss * dt;
+        if (curr_max_speed_xy_cms > _wp_desired_speed_xy_cms) {
+            curr_max_speed_xy_cms = _wp_desired_speed_xy_cms;
+        }
+    } else if (_wp_desired_speed_xy_cms < curr_max_speed_xy_cms) {
+        // slow down is requested so reduce speed within limit set by WPNAV_ACCEL
+        curr_max_speed_xy_cms -= _wp_accel_cmss * dt;
+        if (curr_max_speed_xy_cms < _wp_desired_speed_xy_cms) {
+            curr_max_speed_xy_cms = _wp_desired_speed_xy_cms;
+        }
+    }
+
+    // update position controller speed
+    _pos_control.set_max_speed_xy(curr_max_speed_xy_cms);
+    
+    // flag that wp leash must be recalculated
+    _flags.recalc_wp_leash = true;
 }

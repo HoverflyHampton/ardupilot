@@ -433,6 +433,9 @@ void NavEKF3_core::InitialiseVariables()
     // initialise pre-arm message
     dal.snprintf(prearm_fail_string, sizeof(prearm_fail_string), "EKF3 still initialising");
 
+    // initialise pre-arm message
+    hal.util->snprintf(prearm_fail_string, sizeof(prearm_fail_string), "EKF3 still initialising");
+
     InitialiseVariablesMag();
 
     // emergency reset of yaw to EKFGSF estimate

@@ -11,6 +11,7 @@
 // @Field: I: barometer sensor instance number
 // @Field: Alt: calculated altitude
 // @Field: Press: measured atmospheric pressure
+// @Field: GndPress: measured atmospheric pressure at base
 // @Field: Temp: measured atmospheric temperature
 // @Field: CRt: derived climb rate from primary barometer
 // @Field: SMS: time last sample was taken
@@ -23,6 +24,7 @@ struct PACKED log_BARO {
     uint8_t instance;
     float   altitude;
     float   pressure;
+    float   ground_pressure
     int16_t temperature;
     float   climbrate;
     uint32_t sample_time_ms;
@@ -33,4 +35,4 @@ struct PACKED log_BARO {
 
 #define LOG_STRUCTURE_FROM_BARO \
     { LOG_BARO_MSG, sizeof(log_BARO), \
-      "BARO",  "QBffcfIffB", "TimeUS,I,Alt,Press,Temp,CRt,SMS,Offset,GndTemp,Health", "s#mPOnsmO-", "F-00B0C?0-" },
+      "BARO",  "QBffcfIffB", "TimeUS,I,Alt,Press,GndPress,Temp,CRt,SMS,Offset,GndTemp,Health", "s#mPPOnsmO-", "F-000B0C?0-" },

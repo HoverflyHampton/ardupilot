@@ -2115,7 +2115,6 @@ void GCS::update_send()
     for (uint8_t i=0; i<first_backend_to_send; i++) {
         chan(i)->update_send();
     }
-
     service_statustext();
 
     first_backend_to_send++;

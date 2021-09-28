@@ -94,6 +94,9 @@ PA12 CAN_TX CAN
 # reduce memory overheads
 define HAL_CAN_POOL_SIZE 2500
 
+# reduce memory overheads
+define HAL_CAN_POOL_SIZE 2500
+
 define HAL_USE_I2C TRUE
 define STM32_I2C_USE_I2C1 TRUE
 

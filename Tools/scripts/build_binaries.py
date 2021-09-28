@@ -617,6 +617,7 @@ is bob we will attempt to checkout bob-AVR'''
                 "Pixracer-bdshot",
                 "F4BY",
                 "mRoX21-777",
+                "mRoControlZeroClassic",
                 "mRoControlZeroF7",
                 "mRoNexus",
                 "mRoPixracerPro",

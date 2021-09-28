@@ -297,7 +297,8 @@ for t in $CI_BUILD_TARGET; do
                 --check-c-compiler="$c_compiler" \
                 --check-cxx-compiler="$cxx_compiler"
         $waf clean
-        $waf all
+        $waf copter
+        $waf plane
         ccache -s && ccache -z
 
         if [[ $t == "linux" ]]; then
@@ -311,7 +312,6 @@ python Tools/autotest/param_metadata/param_parse.py --vehicle Rover
 python Tools/autotest/param_metadata/param_parse.py --vehicle AntennaTracker
 python Tools/autotest/param_metadata/param_parse.py --vehicle ArduCopter
 python Tools/autotest/param_metadata/param_parse.py --vehicle ArduPlane
-python Tools/autotest/param_metadata/param_parse.py --vehicle ArduSub
 
 echo build OK
 exit 0

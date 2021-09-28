@@ -292,6 +292,7 @@ void ModeZigZag::manual_control()
 {
     float target_yaw_rate = 0.0f;
     float target_climb_rate = 0.0f;
+    float takeoff_climb_rate = 0.0f;
 
     // process pilot inputs unless we are in radio failsafe
     if (!copter.failsafe.radio) {

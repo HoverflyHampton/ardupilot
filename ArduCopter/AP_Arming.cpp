@@ -145,6 +145,23 @@ bool AP_Arming_Copter::parameter_checks(bool display_failure)
     // check various parameter values
     if ((checks_to_perform == ARMING_CHECK_ALL) || (checks_to_perform & ARMING_CHECK_PARAMETERS)) {
 
+<<<<<<< HEAD
+=======
+	    // checks MOT_PWM_MIN/MAX for acceptable values
+#if (FRAME_CONFIG != HELI_FRAME)
+        if (copter.motors->check_mot_pwm_params()) {
+            check_failed(ARMING_CHECK_PARAMETERS, display_failure, "Check MOT_PWM_MAX/MIN");
+            return false;
+        } 
+#endif
+
+        // ensure all rc channels have different functions
+        if (rc().duplicate_options_exist()) {
+            check_failed(ARMING_CHECK_PARAMETERS, display_failure, "Duplicate Aux Switch Options");
+            return false;
+        }
+
+>>>>>>> HF_DEV
         // failsafe parameter checks
         if (copter.g.failsafe_throttle) {
             // check throttle min is above throttle failsafe trigger and that the trigger is above ppm encoder's loss-of-signal value of 900
@@ -313,6 +330,14 @@ bool AP_Arming_Copter::motor_checks(bool display_failure)
         return true;
     }
 
+	    //servo_test check
+#if FRAME_CONFIG == HELI_FRAME
+    if(copter.motors->servo_test_running()) {
+        check_failed(display_failure, "Servo Test is still running");
+        return false;
+    }
+#endif
+
     // if this is a multicopter using ToshibaCAN ESCs ensure MOT_PMW_MIN = 1000, MOT_PWM_MAX = 2000
 #if HAL_MAX_CAN_PROTOCOL_DRIVERS && (FRAME_CONFIG != HELI_FRAME)
     bool tcan_active = false;
@@ -417,6 +442,18 @@ bool AP_Arming_Copter::rc_calibration_checks(bool display_failure)
 // performs pre_arm gps related checks and returns true if passed
 bool AP_Arming_Copter::gps_checks(bool display_failure)
 {
+<<<<<<< HEAD
+=======
+    // run mandatory gps checks first
+    if (!mandatory_gps_checks(display_failure)) {
+        AP_Notify::flags.pre_arm_gps_check = false;
+        return false;
+    }
+
+    // check if flight mode requires GPS
+    bool mode_requires_gps = copter.flightmode->requires_GPS();
+
+>>>>>>> HF_DEV
     // check if fence requires GPS
     bool fence_requires_gps = false;
     #if AC_FENCE == ENABLED
@@ -424,6 +461,7 @@ bool AP_Arming_Copter::gps_checks(bool display_failure)
     fence_requires_gps = (copter.fence.get_enabled_fences() & (AC_FENCE_TYPE_CIRCLE | AC_FENCE_TYPE_POLYGON)) > 0;
     #endif
 
+<<<<<<< HEAD
     // check if flight mode requires GPS
     bool mode_requires_gps = copter.flightmode->requires_GPS();
 
@@ -441,6 +479,8 @@ bool AP_Arming_Copter::gps_checks(bool display_failure)
         return false;
     }
 
+=======
+>>>>>>> HF_DEV
     // return true if GPS is not required
     if (!mode_requires_gps && !fence_requires_gps) {
         AP_Notify::flags.pre_arm_gps_check = true;
@@ -457,6 +497,15 @@ bool AP_Arming_Copter::gps_checks(bool display_failure)
     if (copter.gps.get_hdop() > copter.g.gps_hdop_good) {
         check_failed(ARMING_CHECK_GPS, display_failure, "High GPS HDOP");
         AP_Notify::flags.pre_arm_gps_check = false;
+<<<<<<< HEAD
+=======
+        return false;
+    }
+
+    // call parent gps checks
+    if (!AP_Arming::gps_checks(display_failure)) {
+        AP_Notify::flags.pre_arm_gps_check = false;
+>>>>>>> HF_DEV
         return false;
     }
 
@@ -508,6 +557,7 @@ bool AP_Arming_Copter::proximity_checks(bool display_failure) const
 // performs mandatory gps checks.  returns true if passed
 bool AP_Arming_Copter::mandatory_gps_checks(bool display_failure)
 {
+<<<<<<< HEAD
     // check if flight mode requires GPS
     bool mode_requires_gps = copter.flightmode->requires_GPS();
 
@@ -519,6 +569,22 @@ bool AP_Arming_Copter::mandatory_gps_checks(bool display_failure)
         return false;
     }
 
+=======
+    // always check if inertial nav has started and is ready
+    const AP_AHRS_NavEKF &ahrs = AP::ahrs_navekf();
+    if (!ahrs.prearm_healthy()) {
+        const char *reason = ahrs.prearm_failure_reason();
+        if (reason == nullptr) {
+            reason = "AHRS not healthy";
+        }
+        check_failed(display_failure, "%s", reason);
+        return false;
+    }
+
+    // check if flight mode requires GPS
+    bool mode_requires_gps = copter.flightmode->requires_GPS();
+
+>>>>>>> HF_DEV
     // check if fence requires GPS
     bool fence_requires_gps = false;
     #if AC_FENCE == ENABLED
@@ -526,6 +592,7 @@ bool AP_Arming_Copter::mandatory_gps_checks(bool display_failure)
     fence_requires_gps = (copter.fence.get_enabled_fences() & (AC_FENCE_TYPE_CIRCLE | AC_FENCE_TYPE_POLYGON)) > 0;
     #endif
 
+<<<<<<< HEAD
     if (mode_requires_gps) {
         if (!copter.position_ok()) {
             // vehicle level position estimate checks
@@ -543,6 +610,26 @@ bool AP_Arming_Copter::mandatory_gps_checks(bool display_failure)
             // return true if GPS is not required
             return true;
         }
+=======
+    // return true if GPS is not required
+    if (!mode_requires_gps && !fence_requires_gps) {
+        return true;
+    }
+
+    // ensure GPS is ok
+    if (!copter.position_ok()) {
+        const char *reason = ahrs.prearm_failure_reason();
+        if (reason == nullptr) {
+            if (!mode_requires_gps && fence_requires_gps) {
+                // clarify to user why they need GPS in non-GPS flight mode
+                reason = "Fence enabled, need 3D Fix";
+            } else {
+                reason = "Need 3D Fix";
+            }
+        }
+        check_failed(display_failure, "%s", reason);
+        return false;
+>>>>>>> HF_DEV
     }
 
     // check for GPS glitch (as reported by EKF)
@@ -554,6 +641,7 @@ bool AP_Arming_Copter::mandatory_gps_checks(bool display_failure)
         }
     }
 
+<<<<<<< HEAD
     // check EKF's compass, position and velocity variances are below failsafe threshold
     if (copter.g.fs_ekf_thresh > 0.0f) {
         float vel_variance, pos_variance, hgt_variance, tas_variance;
@@ -582,6 +670,21 @@ bool AP_Arming_Copter::mandatory_gps_checks(bool display_failure)
     // check if vehicle is too far from EKF origin
     if (copter.far_from_EKF_origin(copter.current_loc)) {
         check_failed(display_failure, "Vehicle too far from EKF origin");
+=======
+    // check EKF compass variance is below failsafe threshold
+    float vel_variance, pos_variance, hgt_variance, tas_variance;
+    Vector3f mag_variance;
+    Vector2f offset;
+    ahrs.get_variances(vel_variance, pos_variance, hgt_variance, mag_variance, tas_variance, offset);
+    if (copter.g.fs_ekf_thresh > 0 && mag_variance.length() >= copter.g.fs_ekf_thresh) {
+        check_failed(display_failure, "EKF compass variance");
+        return false;
+    }
+
+    // check home and EKF origin are not too far
+    if (copter.far_from_EKF_origin(ahrs.get_home())) {
+        check_failed(display_failure, "EKF-home variance");
+>>>>>>> HF_DEV
         return false;
     }
 
@@ -599,6 +702,7 @@ bool AP_Arming_Copter::gcs_failsafe_check(bool display_failure)
     return true;
 }
 
+<<<<<<< HEAD
 // check winch
 bool AP_Arming_Copter::winch_checks(bool display_failure) const
 {
@@ -633,6 +737,8 @@ bool AP_Arming_Copter::alt_checks(bool display_failure)
     return true;
 }
 
+=======
+>>>>>>> HF_DEV
 // arm_checks - perform final checks before arming
 //  always called just before arming.  Return true if ok to arm
 //  has side-effect that logging is started
@@ -755,6 +861,7 @@ bool AP_Arming_Copter::arm_checks(AP_Arming::Method method)
 bool AP_Arming_Copter::mandatory_checks(bool display_failure)
 {
     // call mandatory gps checks and update notify status because regular gps checks will not run
+<<<<<<< HEAD
     bool result = mandatory_gps_checks(display_failure);
     AP_Notify::flags.pre_arm_gps_check = result;
 
@@ -763,6 +870,10 @@ bool AP_Arming_Copter::mandatory_checks(bool display_failure)
         result = false;
     }
 
+=======
+    const bool result = mandatory_gps_checks(display_failure);
+    AP_Notify::flags.pre_arm_gps_check = result;
+>>>>>>> HF_DEV
     return result;
 }
 

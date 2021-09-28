@@ -138,3 +138,4 @@ void AP_RCProtocol_Backend::log_data(AP_RCProtocol::rcprotocol_t prot, uint32_t 
     }
 #endif
 }
+

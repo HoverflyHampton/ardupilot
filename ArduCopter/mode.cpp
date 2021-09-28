@@ -224,6 +224,12 @@ bool Copter::set_mode(Mode::Number mode, ModeReason reason)
             return false;
         }
     }
+
+    #if MODE_AUTOROTATE_ENABLED == ENABLED
+        // If changing to autorotate flight mode from a non-manual throttle mode, store the previous flight mode
+        // to exit back to it when interlock is re-engaged
+        prev_control_mode = control_mode;
+    #endif
 #endif
 
 #if FRAME_CONFIG != HELI_FRAME

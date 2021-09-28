@@ -719,6 +719,9 @@ void AC_PosControl::set_max_speed_accel_z(float speed_down, float speed_up, floa
     if (is_positive(_pid_accel_z.filt_E_hz())) {
         _jerk_z_max = MIN(_jerk_z_max, MIN(GRAVITY_MSS * 100.0, _accel_max_z_cmss) * (M_2PI * _pid_accel_z.filt_E_hz()) / 5.0);
     }
+    _accel_cms = accel_cmss;
+    _flags.recalc_leash_xy = true;
+    calc_leash_length_xy();
 }
 
 /// set_correction_speed_accel_z - set the position controller correction velocity and acceleration limit
