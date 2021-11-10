@@ -76,8 +76,6 @@ bool AP_Baro_BMP388::init()
     }
     WITH_SEMAPHORE(dev->get_semaphore());
 
-    has_sample = false;
-
     dev->set_speed(AP_HAL::Device::SPEED_HIGH);
 
     // setup to allow reads on SPI
@@ -107,6 +105,9 @@ bool AP_Baro_BMP388::init()
     dev->write_register(BMP388_REG_PWR_CTRL, 0x33, true);
 
     instance = _frontend.register_sensor();
+
+    dev->set_device_type(DEVTYPE_BARO_BMP388);
+    set_bus_id(instance, dev->get_bus_id());
 
     // request 50Hz update
     dev->register_periodic_callback(20 * AP_USEC_PER_MSEC, FUNCTOR_BIND_MEMBER(&AP_Baro_BMP388::timer, void));
@@ -142,12 +143,16 @@ void AP_Baro_BMP388::update(void)
 {
     WITH_SEMAPHORE(_sem);
 
-    if (!has_sample) {
+    if (pressure_count == 0) {
         return;
     }
 
-    _copy_to_frontend(instance, pressure, temperature);
-    has_sample = false;
+    _copy_to_frontend(instance,
+                      pressure_sum/pressure_count,
+                      temperature);
+
+    pressure_sum = 0;
+    pressure_count = 0;
 }
 
 /*
@@ -208,9 +213,9 @@ void AP_Baro_BMP388::update_pressure(uint32_t data)
     float press = partial_out1 + partial_out2 + partial4;
 
     WITH_SEMAPHORE(_sem);
-    
-    pressure = press;
-    has_sample = true;
+
+    pressure_sum += press;
+    pressure_count++;
 }
 
 /*

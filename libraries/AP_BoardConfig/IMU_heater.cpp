@@ -75,6 +75,14 @@ void AP_BoardConfig::set_imu_temp(float current)
     }
 
     if (now - heater.last_log_ms >= 1000) {
+// @LoggerMessage: HEAT
+// @Description: IMU Heater data
+// @Field: TimeUS: Time since system startup
+// @Field: Temp: Current IMU temperature
+// @Field: Targ: Target IMU temperature
+// @Field: P: Proportional portion of response
+// @Field: I: Integral portion of response
+// @Field: Out: Controller output to heating element
         AP::logger().Write("HEAT", "TimeUS,Temp,Targ,P,I,Out", "Qfbfff",
                            AP_HAL::micros64(),
                            avg, target,
@@ -84,9 +92,9 @@ void AP_BoardConfig::set_imu_temp(float current)
         heater.last_log_ms = now;
     }
 #if 0
-    gcs().send_text(MAV_SEVERITY_INFO, "Heater: P=%.1f I=%.1f Out=%.1f Temp=%.1f",
-                    heater.output,
-                    avg);
+    gcs().send_text(MAV_SEVERITY_INFO, "Heater: Out=%.1f Temp=%.1f",
+                    double(heater.output),
+                    double(avg));
 #endif
 
 #if HAL_WITH_IO_MCU

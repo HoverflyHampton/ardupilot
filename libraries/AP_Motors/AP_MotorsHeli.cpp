@@ -13,11 +13,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/*
- *       AP_MotorsHeli.cpp - ArduCopter motors library
- *       Code by RandyMackay. DIYDrones.com
- *
- */
 #include <stdlib.h>
 #include <AP_HAL/AP_HAL.h>
 #include "AP_MotorsHeli.h"
@@ -60,7 +55,7 @@ const AP_Param::GroupInfo AP_MotorsHeli::var_info[] = {
 
     // @Param: SV_MAN
     // @DisplayName: Manual Servo Mode
-    // @Description: Manual servo override for swash set-up. Do not set this manually!
+    // @Description: Manual servo override for swash set-up. Must be 0 (Disabled) for flight!
     // @Values: 0:Disabled,1:Passthrough,2:Max collective,3:Mid collective,4:Min collective
     // @User: Standard
     AP_GROUPINFO("SV_MAN",  6, AP_MotorsHeli, _servo_mode, SERVO_CONTROL_MODE_AUTOMATED),
@@ -118,7 +113,6 @@ const AP_Param::GroupInfo AP_MotorsHeli::var_info[] = {
     // @Param: OPTIONS
     // @DisplayName: Heli_Options
     // @Description: Bitmask of heli options.  Bit 0 changes how the pitch, roll, and yaw axis integrator term is managed for low speed and takeoff/landing. In AC 4.0 and earlier, scheme uses a leaky integrator for ground speeds less than 5 m/s and won't let the steady state integrator build above ILMI. The integrator is allowed to build to the ILMI value when it is landed.  The other integrator management scheme bases integrator limiting on takeoff and landing.  Whenever the aircraft is landed the integrator is set to zero.  When the aicraft is airborne, the integrator is only limited by IMAX. 
-    // @Values: 0:I term management based landed state, 1:Leaky I(4.0 and earlier)
     // @Bitmask: 0:Use Leaky I
     // @User: Standard
     AP_GROUPINFO("OPTIONS", 28, AP_MotorsHeli, _heli_options, (uint8_t)HeliOption::USE_LEAKY_I),
@@ -159,17 +153,18 @@ void AP_MotorsHeli::init(motor_frame_class frame_class, motor_frame_type frame_t
     calculate_scalars();
 
     // record successful initialisation if what we setup was the desired frame_class
-    _flags.initialised_ok = (frame_class == MOTOR_FRAME_HELI);
+    set_initialised_ok(frame_class == MOTOR_FRAME_HELI);
 
     // set flag to true so targets are initialized once aircraft is armed for first time
     _heliflags.init_targets_on_arming = true;
 
+    _mav_type = MAV_TYPE_HELICOPTER;
 }
 
 // set frame class (i.e. quad, hexa, heli) and type (i.e. x, plus)
 void AP_MotorsHeli::set_frame_class_and_type(motor_frame_class frame_class, motor_frame_type frame_type)
 {
-    _flags.initialised_ok = (frame_class == MOTOR_FRAME_HELI);
+    set_initialised_ok(frame_class == MOTOR_FRAME_HELI);
 }
 
 // output_min - sets servos to neutral point with motors stopped
@@ -195,12 +190,11 @@ void AP_MotorsHeli::output()
     // run spool logic
     output_logic();
 
-    if (_flags.armed) {
-        //block servo_test from happening at disarm
+    if (armed()) {
+        // block servo_test from happening at disarm
         _servo_test_cycle_counter = 0;
-        
         calculate_armed_scalars();
-        if (!_flags.interlock) {
+        if (!get_interlock()) {
             output_armed_zero_throttle();
         } else {
             output_armed_stabilizing();
@@ -239,12 +233,12 @@ void AP_MotorsHeli::output_armed_zero_throttle()
 void AP_MotorsHeli::output_disarmed()
 {
     if (_servo_test_cycle_counter > 0){
-		//set servo_test_flag
+        // set servo_test_flag
         _heliflags.servo_test_running = true;
         // perform boot-up servo test cycle if enabled
         servo_test();
     } else {
-		//set servo_test flag
+        // set servo_test flag
         _heliflags.servo_test_running = false;
         // manual override (i.e. when setting up swash)
         switch (_servo_mode) {
@@ -310,8 +304,8 @@ void AP_MotorsHeli::output_disarmed()
 void AP_MotorsHeli::output_logic()
 {
     // force desired and current spool mode if disarmed and armed with interlock enabled
-    if (_flags.armed) {
-        if (!_flags.interlock) {
+    if (armed()) {
+        if (!get_interlock()) {
             _spool_desired = DesiredSpoolState::GROUND_IDLE;
         } else {
             _heliflags.init_targets_on_arming = false;

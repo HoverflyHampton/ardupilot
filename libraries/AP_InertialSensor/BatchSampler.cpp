@@ -16,14 +16,13 @@ const AP_Param::GroupInfo AP_InertialSensor::BatchSampler::var_info[] = {
     // @DisplayName: Sensor Bitmask
     // @Description: Bitmap of which IMUs to log batch data for. This option takes effect on the next reboot.
     // @User: Advanced
-    // @Values: 0:None,1:First IMU,255:All
     // @Bitmask: 0:IMU1,1:IMU2,2:IMU3
     // @RebootRequired: True
     AP_GROUPINFO("BAT_MASK",  2, AP_InertialSensor::BatchSampler, _sensor_mask,   DEFAULT_IMU_LOG_BAT_MASK),
 
     // @Param: BAT_OPT
     // @DisplayName: Batch Logging Options Mask
-    // @Description: Options for the BatchSampler
+    // @Description: Options for the BatchSampler. Post-filter and sensor-rate logging cannot be used at the same time.
     // @Bitmask: 0:Sensor-Rate Logging (sample at full sensor rate seen by AP), 1: Sample post-filtering
     // @User: Advanced
     AP_GROUPINFO("BAT_OPT",  3, AP_InertialSensor::BatchSampler, _batch_options_mask, 0),
@@ -209,27 +208,18 @@ void AP_InertialSensor::BatchSampler::push_data_to_log()
             }
             break;
         }
-        if (!logger->Write_ISBH(isb_seqnum,
-                                       type,
-                                       instance,
-                                       multiplier,
-                                       _required_count,
-                                       measurement_started_us,
-                                       sample_rate)) {
+        if (!Write_ISBH(sample_rate)) {
             // buffer full?
             return;
         }
         isbh_sent = true;
     }
-    // pack and send a data packet:
-    if (!logger->Write_ISBD(isb_seqnum,
-                                   data_read_offset/samples_per_msg,
-                                   &data_x[data_read_offset],
-                                   &data_y[data_read_offset],
-                                   &data_z[data_read_offset])) {
+    // pack a nd send a data packet:
+    if (!Write_ISBD()) {
         // maybe later?!
         return;
     }
+
     data_read_offset += samples_per_msg;
     last_sent_ms = AP_HAL::millis();
     if (data_read_offset >= _required_count) {

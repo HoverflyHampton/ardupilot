@@ -137,6 +137,9 @@ bool AP_Baro_BMP085::_init()
 
     _instance = _frontend.register_sensor();
 
+    _dev->set_device_type(DEVTYPE_BARO_BMP085);
+    set_bus_id(_instance, _dev->get_bus_id());
+    
     _dev->register_periodic_callback(20000, FUNCTOR_BIND_MEMBER(&AP_Baro_BMP085::_timer, void));
     return true;
 }
@@ -335,6 +338,7 @@ bool AP_Baro_BMP085::_data_ready()
         break;
     case BMP085_OVERSAMPLING_ULTRAHIGHRES:
         conversion_time_msec = 26;
+        break;
     default:
         break;
     }

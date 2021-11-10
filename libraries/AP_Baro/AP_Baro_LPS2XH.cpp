@@ -106,9 +106,7 @@ AP_Baro_Backend *AP_Baro_LPS2XH::probe_InvensenseIMU(AP_Baro &baro,
 */
 bool AP_Baro_LPS2XH::_imu_i2c_init(uint8_t imu_address)
 {
-    if (!_dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
-        return false;
-    }
+    _dev->get_semaphore()->take_blocking();
 
     // as the baro device is already locked we need to re-use it,
     // changing its address to match the IMU address
@@ -138,11 +136,10 @@ bool AP_Baro_LPS2XH::_imu_i2c_init(uint8_t imu_address)
 
 bool AP_Baro_LPS2XH::_init()
 {
-    if (!_dev || !_dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
+    if (!_dev) {
         return false;
     }
-
-    _has_sample = false;
+    _dev->get_semaphore()->take_blocking();
 
     _dev->set_speed(AP_HAL::Device::SPEED_HIGH);
 
@@ -180,6 +177,9 @@ bool AP_Baro_LPS2XH::_init()
 
     _instance = _frontend.register_sensor();
 
+    _dev->set_device_type(DEVTYPE_BARO_LPS2XH);
+    set_bus_id(_instance, _dev->get_bus_id());
+    
     _dev->get_semaphore()->give();
 
     _dev->register_periodic_callback(CallTime, FUNCTOR_BIND_MEMBER(&AP_Baro_LPS2XH::_timer, void));
@@ -224,21 +224,19 @@ void AP_Baro_LPS2XH::_timer(void)
     if (status & 0x01) {
         _update_pressure();
     }
-
-    _has_sample = true;
 }
 
 // transfer data to the frontend
 void AP_Baro_LPS2XH::update(void)
 {
-    if (!_has_sample) {
+    if (_pressure_count == 0) {
         return;
     }
 
     WITH_SEMAPHORE(_sem);
-    _copy_to_frontend(_instance, _pressure, _temperature);
-
-    _has_sample = false;
+    _copy_to_frontend(_instance, _pressure_sum/_pressure_count, _temperature);
+    _pressure_sum = 0;
+    _pressure_count = 0;
 }
 
 // calculate temperature
@@ -273,5 +271,6 @@ void AP_Baro_LPS2XH::_update_pressure(void)
     int32_t Pressure_mb = Pressure_Reg_s32 * (100.0f / 4096); // scale for pa
 
     WITH_SEMAPHORE(_sem);
-    _pressure = Pressure_mb;
+    _pressure_sum += Pressure_mb;
+    _pressure_count++;
 }

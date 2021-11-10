@@ -61,6 +61,7 @@ public:
     float board_voltage(void) override { return _board_voltage; }
     float servorail_voltage(void) override { return _servorail_voltage; }
     uint16_t power_status_flags(void) override { return _power_flags; }
+    uint16_t accumulated_power_status_flags(void) const override { return _accumulated_power_flags; }
     static void adccallback(ADCDriver *adcp);
 
 private:
@@ -74,6 +75,8 @@ private:
     float _servorail_voltage;
     float _rssi_voltage;
     uint16_t _power_flags;
+    uint16_t _accumulated_power_flags;  // bitmask of all _power_flags ever set
+
     ADCConversionGroup adcgrpcfg;
 
     struct pin_info {
@@ -85,6 +88,7 @@ private:
     static adcsample_t *samples;
     static uint32_t sample_sum[];
     static uint32_t sample_count;
+    HAL_Semaphore _semaphore;
 };
 
 #endif // HAL_USE_ADC

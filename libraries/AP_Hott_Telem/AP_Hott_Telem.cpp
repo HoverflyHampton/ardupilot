@@ -147,8 +147,10 @@ void AP_Hott_Telem::send_EAM(void)
     msg.climbrate3s = 120 + vel.z * -3;
 
     const AP_RPM *rpm = AP::rpm();
-    float rpm_value = rpm->get_rpm(0);
-    msg.rpm = rpm_value * 0.1;
+    float rpm_value;
+    if (rpm && rpm->get_rpm(0, rpm_value)) {
+        msg.rpm = rpm_value * 0.1;
+    }
 
     AP_Stats *stats = AP::stats();
     if (stats) {
@@ -273,24 +275,14 @@ void AP_Hott_Telem::send_GPS(void)
     msg.vel_east = vel.y * 1000 + 0.5;
     msg.altitude = uint16_t(500.5 + alt);
 
-    switch (gps.status()) {
-    case AP_GPS::NO_GPS:
-    case AP_GPS::NO_FIX:
-        msg.gps_fix_char = '-';
-        break;
-    case AP_GPS::GPS_OK_FIX_2D:
-        msg.gps_fix_char = '2';
-        break;
-    default:
-        msg.gps_fix_char = '3';
-        break;
-    }
+    msg.gps_fix_char = gps.status_onechar();
     msg.free_char3 = msg.gps_fix_char;
 
     msg.home_direction = degrees(atan2f(home_vec.y, home_vec.x)) * 0.5 + 0.5;
 
     AP_RTC &rtc = AP::rtc();
     {
+        WITH_SEMAPHORE(rtc.get_semaphore());
         uint16_t ms;
         rtc.get_system_clock_utc(msg.gps_time_h, msg.gps_time_m, msg.gps_time_s, ms);
     }
@@ -416,10 +408,7 @@ void AP_Hott_Telem::loop(void)
             continue;
         }
         if (n > 2) {
-            while (n--) {
-                uart->read();
-                hal.scheduler->delay_microseconds(100);
-            }
+            uart->discard_input();
             continue;
         }
 

@@ -1,4 +1,4 @@
-include ../f303-periph/hwdef.dat
+include ../f303-periph/hwdef.inc
 
 # use DNA
 define HAL_CAN_DEFAULT_NODE_ID 0
@@ -15,4 +15,4 @@ define HAL_PROBE_EXTERNAL_I2C_COMPASSES
 # GPS+MAG
 define HAL_PERIPH_ENABLE_GPS
 define HAL_PERIPH_ENABLE_MAG
-define HAL_PERIPH_ENABLE_NCP5623_LED
+define HAL_PERIPH_ENABLE_NCP5623_LED_WITHOUT_NOTIFY

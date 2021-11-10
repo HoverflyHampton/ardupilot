@@ -29,6 +29,8 @@ public:
         SUB_FRAME_CUSTOM
     } sub_frame_t;
 
+    const char* get_frame_string() const override { return _frame_class_string; };
+
     // Override parent
     void setup_motors(motor_frame_class frame_class, motor_frame_type frame_type) override;
 
@@ -67,7 +69,6 @@ protected:
     AP_Int8             _motor_reverse[AP_MOTORS_MAX_NUM_MOTORS];
     AP_Float            _forwardVerticalCouplingFactor;
 
-    float               _throttle_factor[AP_MOTORS_MAX_NUM_MOTORS]; // each motors contribution to throttle (climb/descent)
     float               _forward_factor[AP_MOTORS_MAX_NUM_MOTORS]; // each motors contribution to forward/backward
     float               _lateral_factor[AP_MOTORS_MAX_NUM_MOTORS];  // each motors contribution to lateral (left/right)
 

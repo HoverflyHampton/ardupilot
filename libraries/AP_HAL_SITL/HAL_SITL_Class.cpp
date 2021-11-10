@@ -13,12 +13,15 @@
 #include "Scheduler.h"
 #include "AnalogIn.h"
 #include "UARTDriver.h"
+#include "I2CDevice.h"
 #include "Storage.h"
 #include "RCInput.h"
 #include "RCOutput.h"
 #include "GPIO.h"
 #include "SITL_State.h"
 #include "Util.h"
+#include "DSP.h"
+#include "CANSocketIface.h"
 
 #include <AP_BoardConfig/AP_BoardConfig.h>
 #include <AP_HAL_Empty/AP_HAL_Empty.h>
@@ -31,13 +34,20 @@ using namespace HALSITL;
 static Storage sitlStorage;
 static SITL_State sitlState;
 static Scheduler sitlScheduler(&sitlState);
+#if !defined(HAL_BUILD_AP_PERIPH)
 static RCInput  sitlRCInput(&sitlState);
 static RCOutput sitlRCOutput(&sitlState);
-static AnalogIn sitlAnalogIn(&sitlState);
 static GPIO sitlGPIO(&sitlState);
+#else
+static Empty::RCInput  sitlRCInput;
+static Empty::RCOutput sitlRCOutput;
+static Empty::GPIO sitlGPIO;
+#endif
+static AnalogIn sitlAnalogIn(&sitlState);
+static DSP dspDriver;
+
 
 // use the Empty HAL for hardware we don't emulate
-static Empty::I2CDeviceManager i2c_mgr_instance;
 static Empty::SPIDeviceManager emptySPI;
 static Empty::OpticalFlow emptyOpticalFlow;
 static Empty::Flash emptyFlash;
@@ -50,8 +60,19 @@ static UARTDriver sitlUart4Driver(4, &sitlState);
 static UARTDriver sitlUart5Driver(5, &sitlState);
 static UARTDriver sitlUart6Driver(6, &sitlState);
 static UARTDriver sitlUart7Driver(7, &sitlState);
+static UARTDriver sitlUart8Driver(8, &sitlState);
 
+#if defined(HAL_BUILD_AP_PERIPH)
+static Empty::I2CDeviceManager i2c_mgr_instance;
+#else
+static I2CDeviceManager i2c_mgr_instance;
+#endif
 static Util utilInstance(&sitlState);
+
+
+#if HAL_NUM_CAN_IFACES
+static HALSITL::CANIface* canDrivers[HAL_NUM_CAN_IFACES];
+#endif
 
 HAL_SITL::HAL_SITL() :
     AP_HAL::HAL(
@@ -63,6 +84,7 @@ HAL_SITL::HAL_SITL() :
         &sitlUart5Driver,   /* uartF */
         &sitlUart6Driver,   /* uartG */
         &sitlUart7Driver,   /* uartH */
+        &sitlUart8Driver,   /* uartI */
         &i2c_mgr_instance,
         &emptySPI,          /* spi */
         &sitlAnalogIn,      /* analogin */
@@ -73,9 +95,15 @@ HAL_SITL::HAL_SITL() :
         &sitlRCOutput,      /* rcoutput */
         &sitlScheduler,     /* scheduler */
         &utilInstance,      /* util */
-        &emptyOpticalFlow, /* onboard optical flow */
-        &emptyFlash, /* flash driver */
-        nullptr),           /* CAN */
+        &emptyOpticalFlow,  /* onboard optical flow */
+        &emptyFlash,        /* flash driver */
+        &dspDriver,         /* dsp driver */
+#if HAL_NUM_CAN_IFACES
+        (AP_HAL::CANIface**)canDrivers
+#else
+        nullptr
+#endif
+        ),           /* CAN */
     _sitl_state(&sitlState)
 {}
 
@@ -150,10 +178,11 @@ void HAL_SITL::run(int argc, char * const argv[], Callbacks* callbacks) const
 {
     assert(callbacks);
 
+    utilInstance.init(argc, argv);
     _sitl_state->init(argc, argv);
 
     scheduler->init();
-    uartA->begin(115200);
+    serial(0)->begin(115200);
 
     rcin->init();
     rcout->init();
@@ -164,7 +193,7 @@ void HAL_SITL::run(int argc, char * const argv[], Callbacks* callbacks) const
     if (getenv("SITL_WATCHDOG_RESET")) {
         INTERNAL_ERROR(AP_InternalError::error_t::watchdog_reset);
         if (watchdog_load((uint32_t *)&utilInstance.persistent_data, (sizeof(utilInstance.persistent_data)+3)/4)) {
-            uartA->printf("Loaded watchdog data");
+            serial(0)->printf("Loaded watchdog data");
             utilInstance.last_persistent_data = utilInstance.persistent_data;
         }
     }
@@ -182,8 +211,9 @@ void HAL_SITL::run(int argc, char * const argv[], Callbacks* callbacks) const
     fill_stack_nan();
 
     callbacks->setup();
-    scheduler->system_initialized();
+    scheduler->set_system_initialized();
 
+#if HAL_LOGGING_ENABLED
     if (getenv("SITL_WATCHDOG_RESET")) {
         const AP_HAL::Util::PersistentData &pd = util->persistent_data;
         AP::logger().WriteCritical("WDOG", "TimeUS,Task,IErr,IErrCnt,IErrLn,MavMsg,MavCmd,SemLine", "QbIHHHHH",
@@ -196,6 +226,7 @@ void HAL_SITL::run(int argc, char * const argv[], Callbacks* callbacks) const
                                    pd.last_mavlink_cmd,
                                    pd.semaphore_line);
     }
+#endif
 
     bool using_watchdog = AP_BoardConfig::watchdog_enabled();
     if (using_watchdog) {
@@ -205,13 +236,18 @@ void HAL_SITL::run(int argc, char * const argv[], Callbacks* callbacks) const
     setup_signal_handlers();
 
     uint32_t last_watchdog_save = AP_HAL::millis();
+    uint8_t fill_count = 0;
 
     while (!HALSITL::Scheduler::_should_reboot) {
         if (HALSITL::Scheduler::_should_exit) {
             ::fprintf(stderr, "Exitting\n");
             exit(0);
         }
-        fill_stack_nan();
+        if (fill_count++ % 10 == 0) {
+            // only fill every 10 loops. This still gives us a lot of
+            // protection, but saves a lot of CPU
+            fill_stack_nan();
+        }
         callbacks->loop();
         HALSITL::Scheduler::_run_io_procs();
 

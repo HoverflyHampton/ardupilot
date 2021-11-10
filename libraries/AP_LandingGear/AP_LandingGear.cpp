@@ -70,7 +70,6 @@ const AP_Param::GroupInfo AP_LandingGear::var_info[] = {
     // @Param: OPTIONS
     // @DisplayName: Landing gear auto retract/deploy options
     // @Description: Options to retract or deploy landing gear in Auto or Guided mode
-    // @Values: 1:Retract after Takeoff, 2:Deploy during Land, 3:Retract after Takeoff AND deploy during Land
     // @Bitmask: 0:Retract after Takeoff,1:Deploy during Land
     // @User: Standard
     AP_GROUPINFO("OPTIONS", 9, AP_LandingGear, _options, 3),
@@ -128,7 +127,7 @@ void AP_LandingGear::set_position(LandingGearCommand cmd)
 void AP_LandingGear::deploy()
 {
     // set servo PWM to deployed position
-    SRV_Channels::set_output_limit(SRV_Channel::k_landing_gear_control, SRV_Channel::SRV_CHANNEL_LIMIT_MAX);
+    SRV_Channels::set_output_limit(SRV_Channel::k_landing_gear_control, SRV_Channel::Limit::MAX);
 
     // send message only if output has been configured
     if (!_deployed &&
@@ -139,17 +138,19 @@ void AP_LandingGear::deploy()
     // set deployed flag
     _deployed = true;
     _have_changed = true;
+    AP::logger().Write_Event(LogEvent::LANDING_GEAR_DEPLOYED);
 }
 
 /// retract - retract landing gear
 void AP_LandingGear::retract()
 {
     // set servo PWM to retracted position
-    SRV_Channels::set_output_limit(SRV_Channel::k_landing_gear_control, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+    SRV_Channels::set_output_limit(SRV_Channel::k_landing_gear_control, SRV_Channel::Limit::MIN);
 
     // reset deployed flag
     _deployed = false;
     _have_changed = true;
+    AP::logger().Write_Event(LogEvent::LANDING_GEAR_RETRACTED);
 
     // send message only if output has been configured
     if (SRV_Channels::function_assigned(SRV_Channel::k_landing_gear_control)) {
@@ -162,7 +163,7 @@ bool AP_LandingGear::deployed()
     if (_pin_deployed == -1) {
         return _deployed;
     } else {
-        return hal.gpio->read(_pin_deployed) == _pin_deployed_polarity ? true : false;
+        return hal.gpio->read(_pin_deployed) == _pin_deployed_polarity;
     }
 }
 
@@ -176,7 +177,7 @@ AP_LandingGear::LG_LandingGear_State AP_LandingGear::get_state()
     return gear_state_current;
 }
 
-uint32_t AP_LandingGear::get_gear_state_duration_ms()
+uint32_t AP_LandingGear::get_gear_state_duration_ms() const
 {
     if (last_gear_event_ms == 0) {
         return 0;
@@ -185,7 +186,7 @@ uint32_t AP_LandingGear::get_gear_state_duration_ms()
     return AP_HAL::millis() - last_gear_event_ms;
 }
 
-uint32_t AP_LandingGear::get_wow_state_duration_ms()
+uint32_t AP_LandingGear::get_wow_state_duration_ms() const
 {
     if (last_wow_event_ms == 0) {
         return 0;

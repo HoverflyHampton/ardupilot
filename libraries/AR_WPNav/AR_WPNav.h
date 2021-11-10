@@ -70,7 +70,7 @@ public:
     float oa_wp_bearing_cd() const { return _oa_wp_bearing_cd; }
 
     // settor to allow vehicle code to provide turn related param values to this library (should be updated regularly)
-    void set_turn_params(float turn_max_g, float turn_radius, bool pivot_possible);
+    void set_turn_params(float turn_radius, bool pivot_possible);
 
     // accessors for parameter values
     float get_default_speed() const { return _speed_max; }
@@ -104,13 +104,17 @@ private:
     // returns true if vehicle should pivot turn at next waypoint
     bool use_pivot_steering_at_next_WP(float yaw_error_cd) const;
 
-    // returns true if vehicle should pivot immediately (because heading error is too large)
-    bool use_pivot_steering(float yaw_error_cd);
+    // updates _pivot_active flag based on heading error to destination
+    // relies on update_distance_and_bearing_to_destination having been called first
+    // to update _oa_wp_bearing and _reversed variables
+    void update_pivot_active_flag();
 
     // adjust speed to ensure it does not fall below value held in SPEED_MIN
-    void apply_speed_min(float &desired_speed);
+    // desired_speed should always be positive (or zero)
+    void apply_speed_min(float &desired_speed) const;
 
-private:
+    // calculate the crosstrack error (does not rely on L1 controller)
+    float calc_crosstrack_error(const Location& current_loc) const;
 
     // parameters
     AP_Float _speed_max;            // target speed between waypoints in m/s
@@ -119,19 +123,20 @@ private:
     AP_Float _overshoot;            // maximum horizontal overshoot in meters
     AP_Int16 _pivot_angle;          // angle error that leads to pivot turn
     AP_Int16 _pivot_rate;           // desired turn rate during pivot turns in deg/sec
+    AP_Float _pivot_delay;          // waiting time after pivot turn
 
     // references
     AR_AttitudeControl& _atc;       // rover attitude control library
     AP_Navigation& _nav_controller; // navigation controller (aka L1 controller)
 
     // variables held in vehicle code (for now)
-    float _turn_max_mss;            // lateral acceleration maximum in m/s/s
     float _turn_radius;             // vehicle turn radius in meters
     bool _pivot_possible;           // true if vehicle can pivot
     bool _pivot_active;             // true if vehicle is currently pivoting
 
     // variables for navigation
     uint32_t _last_update_ms;       // system time of last call to update
+    uint32_t _pivot_start_ms;       // system time when pivot turn started
     Location _origin;               // origin Location (vehicle will travel from the origin to the destination)
     Location _destination;          // destination Location when in Guided_WP
     bool _orig_and_dest_valid;      // true if the origin and destination have been set

@@ -169,7 +169,7 @@ define HAL_BATT_VOLT_SCALE 10.1
 define HAL_BATT_CURR_SCALE 17.0
 
 # setup serial port defaults for ESP8266
-define HAL_SERIAL5_PROTOCOL SerialProtocol_MAVLink
+define HAL_SERIAL5_PROTOCOL SerialProtocol_MAVLink2
 define HAL_SERIAL5_BAUD 921600
 
 # 6 PWM available by default
@@ -190,7 +190,7 @@ define HAL_PROBE_EXTERNAL_I2C_COMPASSES
 
 # Barometer ( DPS310 under test on micro frame )
 BARO MS56XX SPI:ms5611_int
-# BARO DPS280      SPI:dps310
+# BARO DPS310      SPI:dps310
 
 # reserve plenty of memory for DMA for LED buffers
 define DMA_RESERVE_SIZE 32768
