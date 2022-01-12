@@ -3,6 +3,7 @@
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_Math/AP_Math.h>
+#include <AP_HAL/I2CDevice.h>
 #include "AP_BattMonitor_Backend.h"
 #include <utility>
 
@@ -40,6 +41,8 @@ public:
 
     bool has_cell_voltages() const override { return _has_cell_voltages; }
 
+    bool has_temperature() const override { return _has_temperature; }
+
     // all smart batteries are expected to provide current
     bool has_current() const override { return true; }
 
@@ -60,13 +63,16 @@ protected:
     bool read_full_charge_capacity(void);
 
     // reads the remaining capacity
-    // returns true if the read was succesful, which is only considered to be the
+    // returns true if the read was successful, which is only considered to be the
     // we know the full charge capacity
     bool read_remaining_capacity(void);
 
+    // return a scaler that should be multiplied by the battery's reported capacity numbers to arrive at the actual capacity in mAh
+    virtual uint16_t get_capacity_scaler() const { return 1; }
+
     // reads the temperature word from the battery
     // returns true if the read was successful
-    bool read_temp(void);
+    virtual bool read_temp(void);
 
     // reads the serial number if it's not already known
     // returns true if the read was successful, or the number was already known
@@ -91,12 +97,9 @@ protected:
     bool _has_cell_voltages;        // smbus backends flag this as true once they have received a valid cell voltage report
     uint16_t _cycle_count = 0;      // number of cycles the battery has experienced. An amount of discharge approximately equal to the value of DesignCapacity.
     bool _has_cycle_count;          // true if cycle count has been retrieved from the battery
+    bool _has_temperature;
 
     virtual void timer(void) = 0;   // timer function to read from the battery
 
     AP_HAL::Device::PeriodicHandle timer_handle;
 };
-
-// include specific implementations
-#include "AP_BattMonitor_SMBus_Solo.h"
-#include "AP_BattMonitor_SMBus_Maxell.h"

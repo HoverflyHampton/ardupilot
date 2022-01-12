@@ -122,7 +122,6 @@ MAV_RESULT Copter::mavlink_compassmot(const GCS_MAVLINK &gcs_chan)
     EXPECT_DELAY_MS(5000);
 
     // enable motors and pass through throttle
-    init_rc_out();
     enable_motor_output();
     motors->armed(true);
     hal.util->set_soft_armed(true);
@@ -247,9 +246,6 @@ MAV_RESULT Copter::mavlink_compassmot(const GCS_MAVLINK &gcs_chan)
         gcs_chan.send_text(MAV_SEVERITY_NOTICE, "Failed");
         compass.motor_compensation_type(AP_COMPASS_MOT_COMP_DISABLED);
     }
-
-    // display new motor offsets and save
-    report_compass();
 
     // turn off notify leds
     AP_Notify::flags.esc_calibration = false;

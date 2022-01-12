@@ -76,8 +76,6 @@ STDOUT_BAUDRATE 57600
 
 # USB setup
 USB_STRING_MANUFACTURER "mRo"
-USB_STRING_PRODUCT "mRoX21-777"
-USB_STRING_SERIAL  "%SERIAL%"
 
 # this board only has a single I2C bus so make it external
 define HAL_I2C_INTERNAL_MASK 0
@@ -228,7 +226,7 @@ PB14 SPI2_MISO SPI2
 PB15 SPI2_MOSI SPI2
 
 # this input pin is used to detect that power is valid on USB
-PC0 VBUS_VALID INPUT
+PC0 VBUS_nVALID INPUT PULLUP
 
 # this defines the CS pin for the magnetometer and first IMU. Note
 # that CS pins are software controlled, and are not tied to a particular
@@ -330,10 +328,10 @@ PE12 FMU_LED_AMBER OUTPUT GPIO(0)
 # power flag pins. These tell the MCU the status of the various power
 # supplies that are available. The pin names need to exactly match the
 # names used in AnalogIn.cpp. 
-PB5 VDD_BRICK_VALID INPUT PULLUP
-# PB7 VDD_SERVO_VALID INPUT PULLUP #Not Connected
-# PE10 VDD_5V_HIPOWER_OC INPUT PULLUP #Not Connected
-PE15 VDD_5V_PERIPH_OC INPUT PULLUP
+PB5 VDD_BRICK_nVALID INPUT PULLUP
+# PB7 VDD_BRICK2_nVALID INPUT PULLUP #Not Connected
+# PE10 VDD_5V_HIPOWER_nOC INPUT PULLUP #Not Connected
+PE15 VDD_5V_PERIPH_nOC INPUT PULLUP
 
 # now the SPI device table. This table creates all accessible SPI
 # devices, giving the name of the device (which is used by device
@@ -392,7 +390,7 @@ define HAL_BOARD_TERRAIN_DIRECTORY "/APM/TERRAIN"
 
 # we need to tell HAL_ChibiOS/Storage.cpp how much storage is
 # available (in bytes)
-define HAL_STORAGE_SIZE 16384
+define HAL_STORAGE_SIZE 32768
 
 # allow to have have a dedicated safety switch pin
 define HAL_HAVE_SAFETY_SWITCH 1

@@ -13,7 +13,6 @@ xcode-select --install
 
 brew tap ardupilot/homebrew-px4
 brew update
-brew install genromfs
 brew install gcc-arm-none-eabi
 brew install gawk
 
@@ -26,7 +25,7 @@ else
     echo "pip installed"
 fi
 
-pip2 install --user pyserial future empy mavproxy pexpect
+pip2 install --user pyserial future empy mavproxy pexpect geocoder
 
 SCRIPT_DIR=$(dirname $(realpath ${BASH_SOURCE[0]}))
 ARDUPILOT_ROOT=$(realpath "$SCRIPT_DIR/../../")

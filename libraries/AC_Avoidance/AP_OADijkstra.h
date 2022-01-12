@@ -22,6 +22,9 @@ public:
     // set fence margin (in meters) used when creating "safe positions" within the polygon fence
     void set_fence_margin(float margin) { _polyfence_margin = MAX(margin, 0.0f); }
 
+    // trigger Dijkstra's to recalculate shortest path based on current location 
+    void recalculate_path() { _shortest_path_ok = false; }
+
     // update return status enum
     enum AP_OADijkstra_State : uint8_t {
         DIJKSTRA_STATE_NOT_REQUIRED = 0,
@@ -186,4 +189,7 @@ private:
 
     AP_OADijkstra_Error _error_last_id;                 // last error id sent to GCS
     uint32_t _error_last_report_ms;                     // last time an error message was sent to GCS
+
+    // Logging function
+    void Write_OADijkstra(const uint8_t state, const uint8_t error_id, const uint8_t curr_point, const uint8_t tot_points, const Location &final_dest, const Location &oa_dest) const;
 };

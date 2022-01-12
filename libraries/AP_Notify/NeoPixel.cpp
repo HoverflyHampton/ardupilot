@@ -20,10 +20,6 @@
 // This limit is from the dshot driver rcout groups limit
 #define AP_NOTIFY_NEOPIXEL_MAX_INSTANCES        4
 
-#ifndef HAL_NEOPIXEL_COUNT
-#define HAL_NEOPIXEL_COUNT 1
-#endif
-
 // Datasheet: https://cdn-shop.adafruit.com/datasheets/WS2812B.pdf
 // 24bit msg as 3 byte GRB (not RGB) where first bit is G7, and last bit is B0
 // (first) G7|G6|G5|G4|G3|G2|G1|G0|R7|R6|R5|R4|R3|R2|R1|R0|B7|B6|B5|B4|B3|B2|B1|B0 (last)

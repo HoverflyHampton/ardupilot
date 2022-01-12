@@ -4,6 +4,8 @@
 script to build the latest binaries for each vehicle type, ready to upload
 Peter Barker, August 2017
 based on build_binaries.sh by Andrew Tridgell, March 2013
+
+AP_FLAKE8_CLEAN
 """
 
 from __future__ import print_function
@@ -14,13 +16,21 @@ import os
 import re
 import shutil
 import time
+import string
 import subprocess
 import sys
 import gzip
 
 # local imports
-import generate_manifest, gen_stable
+import generate_manifest
+import gen_stable
 import build_binaries_history
+
+if sys.version_info[0] < 3:
+    running_python3 = False
+else:
+    running_python3 = True
+
 
 class build_binaries(object):
     def __init__(self, tags):
@@ -77,6 +87,10 @@ class build_binaries(object):
                     # select not available on Windows... probably...
                 time.sleep(0.1)
                 continue
+            if running_python3:
+                x = bytearray(x)
+                x = filter(lambda x : chr(x) in string.printable, x)
+                x = "".join([chr(c) for c in x])
             output += x
             x = x.rstrip()
             if show_output:
@@ -263,9 +277,9 @@ is bob we will attempt to checkout bob-AVR'''
         if not os.path.exists(versionfile):
             self.progress("%s does not exist" % (versionfile,))
             return
-        ss = ".*define +FIRMWARE_VERSION[	 ]+(?P<major>\d+)[ ]*,[ 	]*" \
-             "(?P<minor>\d+)[ ]*,[	 ]*(?P<point>\d+)[ ]*,[	 ]*" \
-             "(?P<type>[A-Z_]+)[	 ]*"
+        ss = r".*define +FIRMWARE_VERSION[	 ]+(?P<major>\d+)[ ]*,[ 	]*" \
+             r"(?P<minor>\d+)[ ]*,[	 ]*(?P<point>\d+)[ ]*,[	 ]*" \
+             r"(?P<type>[A-Z_]+)[	 ]*"
         content = self.read_string_from_filepath(versionfile)
         match = re.search(ss, content)
         if match is None:
@@ -378,7 +392,7 @@ is bob we will attempt to checkout bob-AVR'''
 
                 if self.skip_board_waf(board):
                     continue
-                
+
                 if os.path.exists(self.buildroot):
                     shutil.rmtree(self.buildroot)
 
@@ -548,10 +562,10 @@ is bob we will attempt to checkout bob-AVR'''
         '''returns list of boards common to all vehicles'''
         return ["fmuv2",
                 "fmuv3",
-                "fmuv4",
                 "fmuv5",
                 "mindpx-v2",
                 "erlebrain2",
+                "navigator",
                 "navio",
                 "navio2",
                 "edge",
@@ -560,20 +574,31 @@ is bob we will attempt to checkout bob-AVR'''
                 "KakuteF4",
                 "KakuteF7",
                 "KakuteF7Mini",
+                "KakuteF4Mini",
+                "MambaF405v2",
                 "MatekF405",
+                "MatekF405-bdshot",
                 "MatekF405-STD",
                 "MatekF405-Wing",
                 "MatekF765-Wing",
+                "MatekF765-SE",
+                "MatekF405-CAN",
                 "MatekH743",
+                "MatekH743-bdshot",
                 "OMNIBUSF7V2",
                 "sparky2",
                 "omnibusf4",
                 "omnibusf4pro",
+                "omnibusf4pro-bdshot",
                 "omnibusf4v6",
                 "OmnibusNanoV6",
+                "OmnibusNanoV6-bdshot",
                 "mini-pix",
                 "airbotf4",
                 "revo-mini",
+                "revo-mini-bdshot",
+                "revo-mini-i2c",
+                "revo-mini-i2c-bdshot",
                 "CubeBlack",
                 "CubeBlack+",
                 "CubePurple",
@@ -586,16 +611,20 @@ is bob we will attempt to checkout bob-AVR'''
                 "CUAVv5Nano",
                 "CUAV-Nora",
                 "CUAV-X7",
+                "CUAV-X7-bdshot",
                 "mRoX21",
                 "Pixracer",
+                "Pixracer-bdshot",
                 "F4BY",
                 "mRoX21-777",
-                "mRoControlZeroClassic",
                 "mRoControlZeroF7",
-                "mRoControlZeroH7",
-                "mRoControlZeroOEMH7",
-                "mRoPixracerPro",
                 "mRoNexus",
+                "mRoPixracerPro",
+                "mRoPixracerPro-bdshot",
+                "mRoControlZeroOEMH7",
+                "mRoControlZeroClassic",
+                "mRoControlZeroH7",
+                "mRoControlZeroH7-bdshot",
                 "F35Lightning",
                 "speedybeef4",
                 "SuccexF4",
@@ -607,9 +636,16 @@ is bob we will attempt to checkout bob-AVR'''
                 "VRBrain-v54",
                 "TBS-Colibri-F7",
                 "Durandal",
+                "Durandal-bdshot",
                 "CubeOrange",
+                "CubeOrange-bdshot",
                 "CubeYellow",
                 "R9Pilot",
+                "QioTekZealotF427",
+                "BeastH7",
+                "BeastF7",
+                "FlywooF745",
+                "luminousbee5",
                 # SITL targets
                 "SITL_x86_64_linux_gnu",
                 "SITL_arm_linux_gnueabihf",
@@ -624,8 +660,17 @@ is bob we will attempt to checkout bob-AVR'''
                 "f303-Universal",
                 "f303-M10025",
                 "f303-M10070",
+                "f303-MatekGPS",
+                "f405-MatekGPS",
+                "f103-Airspeed",
                 "CUAV_GPS",
                 "ZubaxGNSS",
+                "CubeOrange-periph",
+                "CubeBlack-periph",
+                "MatekH743-periph",
+                "HitecMosaic",
+                "FreeflyRTK",
+                "HolybroGPS",
                 ]
 
     def build_arducopter(self, tag):
@@ -691,7 +736,6 @@ is bob we will attempt to checkout bob-AVR'''
                            "AP_Periph",
                            "AP_Periph")
 
-        
     def generate_manifest(self):
         '''generate manigest files for GCS to download'''
         self.progress("Generating manifest")
@@ -706,6 +750,8 @@ is bob we will attempt to checkout bob-AVR'''
         new_json_filepath_gz = os.path.join(self.binaries,
                                             "manifest.json.gz.new")
         with gzip.open(new_json_filepath_gz, 'wb') as gf:
+            if running_python3:
+                content = bytes(content, 'ascii')
             gf.write(content)
         json_filepath = os.path.join(self.binaries, "manifest.json")
         json_filepath_gz = os.path.join(self.binaries, "manifest.json.gz")
@@ -716,7 +762,6 @@ is bob we will attempt to checkout bob-AVR'''
         self.progress("Generating stable releases")
         gen_stable.make_all_stable(self.binaries)
         self.progress("Generate stable releases done")
-
 
     def validate(self):
         '''run pre-run validation checks'''

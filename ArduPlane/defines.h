@@ -49,7 +49,8 @@ enum failsafe_action_long {
 enum StickMixing {
     STICK_MIXING_DISABLED = 0,
     STICK_MIXING_FBW      = 1,
-    STICK_MIXING_DIRECT   = 2
+    STICK_MIXING_DIRECT   = 2,
+    STICK_MIXING_VTOL_YAW = 3,
 };
 
 enum ChannelMixing {
@@ -83,14 +84,19 @@ enum log_messages {
     LOG_NTUN_MSG,
     LOG_STARTUP_MSG,
     TYPE_GROUNDSTART_MSG,
-    LOG_SONAR_MSG,
     LOG_STATUS_MSG,
     LOG_QTUN_MSG,
     LOG_PIQR_MSG,
     LOG_PIQP_MSG,
     LOG_PIQY_MSG,
     LOG_PIQA_MSG,
+    LOG_PIDG_MSG,
     LOG_AETR_MSG,
+    LOG_OFG_MSG,
+    LOG_CMDI_MSG,
+    LOG_CMDA_MSG,
+    LOG_CMDS_MSG,
+    LOG_CMDH_MSG,
 };
 
 #define MASK_LOG_ATTITUDE_FAST          (1<<0)
@@ -110,6 +116,7 @@ enum log_messages {
 #define MASK_LOG_SONAR                  (1<<14)
 // #define MASK_LOG_ARM_DISARM             (1<<15)
 #define MASK_LOG_IMU_RAW                (1UL<<19)
+#define MASK_LOG_ATTITUDE_FULLRATE      (1U<<20)
 
 // altitude control algorithms
 enum {
@@ -138,6 +145,11 @@ enum {
     USE_REVERSE_THRUST_CRUISE                   = (1<<8),
     USE_REVERSE_THRUST_FBWB                     = (1<<9),
     USE_REVERSE_THRUST_GUIDED                   = (1<<10),
+    USE_REVERSE_THRUST_AUTO_LANDING_PATTERN     = (1<<11),
+    USE_REVERSE_THRUST_FBWA                   = (1<<12),
+    USE_REVERSE_THRUST_ACRO                   = (1<<13),
+    USE_REVERSE_THRUST_STABILIZE            = (1<<14),
+    USE_REVERSE_THRUST_THERMAL             = (1<<15),
 };
 
 enum FlightOptions {
@@ -145,6 +157,10 @@ enum FlightOptions {
     CRUISE_TRIM_THROTTLE = (1 << 1),
     DISABLE_TOFF_ATTITUDE_CHK = (1 << 2),
     CRUISE_TRIM_AIRSPEED = (1 << 3),
+    CLIMB_BEFORE_TURN = (1 << 4),
+    ACRO_YAW_DAMPER = (1 << 5),
+    SURPRESS_TKOFF_SCALING = (1<<6),
+    ENABLE_DEFAULT_AIRSPEED = (1<<7),
 };
 
 enum CrowFlapOptions {
@@ -153,3 +169,22 @@ enum CrowFlapOptions {
     PROGRESSIVE_CROW = (1 << 2),
 }; 
 
+
+enum guided_heading_type_t {
+    GUIDED_HEADING_NONE = 0, // no heading track
+    GUIDED_HEADING_COG,      // maintain ground track
+    GUIDED_HEADING_HEADING,  // maintain a heading
+};
+
+
+enum class AirMode {
+    OFF,
+    ON,
+};
+
+enum class FenceAutoEnable : uint8_t {
+    OFF=0,
+    Auto=1,
+    AutoDisableFloorOnly=2,
+    WhenArmed=3
+};

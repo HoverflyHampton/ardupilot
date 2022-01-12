@@ -1,10 +1,270 @@
-Release 4.0.6beta1, 23rd May 2020
+Release 4.1.0beta5 16th August 2021
+-----------------------------------
+
+This is a small beta update, with a few important fixes.
+
+Changes are:
+
+ - Flywoo F745 supports external I2C compasses
+ - GPS-for-yaw arming check added
+ - GPS_DRV_OPTIONS allows forcing UBlox GPS to 115200 baud
+ - Lua scripts can be placed in ROMFS_custom directory
+ - Q_P_VELXY_FILT renamed to _FLTE, Q_P_VELXY_D_FILT renamed to _FLTD
+ - CAN threading fix to resolve potential lockup when lua scripts use CAN
+ - EKF3 GSF can be invoked multiple times with source switching (no longer limited by EK3_GSF_RST_MAX)
+ - EKF3 IMU offset fix (vehicle's reported position was slightly incorrect if INS_POS_XYZ params set)
+ - OSD overwrite and nullptr check fix
+ - RCOut banner displayed at very end of startup procedure to avoid invalid output
+ - allow for VTOL flightmodes after AHRS fallback to DCM
+ - fixed a bug in Z accel initialisation (particularly affects tailsitters)
+ - added LOG_BITMASK bit for logging attitude and PIDs at full loop rate
+
+Happy flying!
+
+Release 4.1.0beta4 25th July 2021
 ---------------------------------
 
-This is a major release with a significant number of new features and
-bug fixes.
+This is a large beta update, with significant changes over beta3.
 
- - scripting generator bug fix
+Changes are:
+
+ - major fixed wing autotune update over previous 4.1 beta releases
+ - added MAN_EXPO_* parameters for input expos in MANUAL, TRAINING and ACRO modes
+ - added ONESHOT_MASK for oneshot output on control surfaces
+ - GPS-for-yaw enhancements including using position and yaw from different GPSs
+ - Long distance flight supported (thousands of km) including double precision EKF and moving origin
+ - major improvements to EKF3 stability
+ - BLHeli fix that could cause failure to boot
+ - CRSF message spamming and firmware string length fixed
+ - Display re-enabled on 1MB boards
+ - DShot always sends 0 when disarmed (protects against motors spin while disarmed due to misconfiguration)
+ - DShot fix that could cause main loop jitter
+ - DShot buzzer tone disabled during motor test to remove bad interation
+ - MatekF405-bdshot NeoPixel LEDs re-enabled on PWM5
+ - Serial port performance improvements using FIFO on H7 boards
+
+Please report all test results and happy flying!
+
+Release 4.1.0beta3 5th July 2021
+--------------------------------
+
+This is a minor update over the 4.0.1beta2 release. It has a few
+important fixes for beta testers:
+
+ - sync with copter 4.1.0beta5
+
+ - added QRTL always option in Q_RTL_MODE
+
+ - added more modes to USE_REV_THRUST parameter
+
+ - added QioTekZealonH743 board type
+
+ - added EKF3 protections for variance collapse
+
+ - added PiccoloCAN servo support
+
+ - improved VTOL position control a long distance from home
+
+ - fixed handling of 180 degree longitude date-line crossing
+
+ - fixed logged after forced arm
+
+ - fixed DShot with quadplane motor test
+
+ - adjusted autotune handling of target filter
+
+ - adjusted default roll/pitch PID filters
+
+Please report all test results, and happy flying!
+
+Release 4.1.0beta2 24th June 2021
+---------------------------------
+
+This is a minor update over the 4.0.1beta1 release. It has a few
+important fixes for beta testers:
+
+ - Fixed a bug in attitude control during the airbrake phase of
+   quadplane landing approach
+
+ - skip POSITION1 stage of landing approach for tailsitters
+
+ - fixed handling of corrupted filesystems on arming, where a long
+   delay during log file creation could cause a watchdog reset
+
+ - fixed build of VRUBrain-v51 board
+
+ - re-enable soaring on MatekF405-Wing
+
+ - fixed calculation of battery consumption on a commanded reset
+
+Please report all test results, and happy flying!
+
+Release 4.1.0beta1 14th June 2021
+---------------------------------
+
+This is a major release, with a lot of changes across almost all
+subsystems. Key changes include:
+
+ - major updates to quadplane control algorithms, including new
+   landing approach system, new input shaping system for all levels of
+   VTOL control and new filtering options.
+
+ - new PID system for fixed wing control, with much more flexible
+   filtering and true rate D term support.
+
+ - new fixed wing autotune system which on most aircraft produces a
+   much better tune than the previous autotune.
+
+There have also been a lot of changes at the low level system level as
+well.
+
+ - new DShot system, with much better timing and new features.
+
+ - improved support for GPS moving baseline yaw
+
+ - new unified ESC telemetry system for CAN, DShot and serial ESC
+   telemetry, allowing for ESC RPM driven notch filters on more ESC
+   types
+
+ - EKF3 is now the default estimator, with EKF2 also available on
+   systems with 2MByte of flash.
+
+ - external AHRS support, allowing for a serial connected AHRS system
+   (VectorNav-300 only at the moment)
+
+ - sensor affinity in EKF3, allowing for more robust handling of
+   sensor failure, especially for airspeed sensors
+
+ - rate PID slew limiting to to detect and suppress oscillations
+
+ - temperature calibration for IMUs, including factory calibration
+   support
+
+ - much improved notch filtering support, including double-notch and
+   realtime FFT based notch filtering
+
+ - lots of lua scripting improvements, with greatly expanded API
+
+ - much faster parameter download and mission upload/down using MAVFTP
+
+Many thanks to everyone who contributed to this release. It is our
+biggest release yet and has benefited from fantastic feedback from our
+user community and partners.
+
+We hope you enjoy this release! Happy flying!
+
+Release 4.0.9, 23rd February 2021
+---------------------------------
+
+This is a minor release with just bug fixes:
+
+ - added automatic backup/restore of parameters in case of FRAM
+   corruption for F7/H7 boards with 32k FRAM parameter storage
+
+ - fixed a bug in EKF2/EKF3 that could cause memory corruption if
+   external naviagtion sources (such as vision based position and
+   velocity data) is supplied before the EKF has initialised
+
+ - fixed a problem with low accuracy data from UAVCAN GPS modules when
+   GPS blending is enabled
+
+ - fixed an arming check failure with u-blox M9 based GPS modules
+
+ - added mRoControlZeroH7 support
+
+The main reason for this release is the parameter backup/restore. This
+has been an ongoing issue for quite some time. The symptom is an
+unexpected full parameter reset on boards using FRAM (also known as
+RAMTRON) for storage, particularly those using F7 or H7 based
+MCUs. The issue has most commonly been seen on the Hex CubeOrange
+board, but has been seen on boards from other vendors as well.
+
+The issue has been frustratingly difficult to reproduce. We did narrow
+down one cause last year which was a floating CS pin in the bootloader
+triggering corruption before ArduPilot starts. An updated bootloader
+reduced the occurrance of the issue a lot and we thought it was
+solved. Since then the problem has still happened a few times on
+boards that have had a bootloader update.
+
+This release avoids the issue by keeping a complete second copy of the
+parameters in the 2nd half of 32k FRAM devices. On boot we check the
+integrity of the primary parameter storage area via a simple signature
+check and if it has been corruptted then we restore from the backup
+area. We also raise an internal error named "params_restored". You
+will then need to reboot to clear the error, but your parameters will
+have been automatically recovered, avoiding the need to reload
+parameters and re-calibrate.
+
+If you get this internal error then it would be appreciated if you
+could send us the contents of your APM/STRG_BAK directory on the
+microSD card so we can analyse the corruption that happened and ensure
+that the fix covers all real cases.
+
+Happy flying!
+
+Release 4.0.8, 26th January 2021
+--------------------------------
+
+This is a minor release with just bug fixes:
+
+ - fixed a bug where an unhealthy airspeed sensor could be fused in EKF2/EKF3
+
+ - fixed FPort RSSI scaling
+
+ - fixed timestamp on RAW_IMU data to be 64 bit
+
+ - fixed an issue with BLHeli pass-thru on some ESCs
+
+Happy flying!
+
+Release 4.0.7, 3rd November 2020
+--------------------------------
+
+This is a minor release over 4.0.6. The changes are:
+
+ - enable telem3 on Durandal
+
+ - fixed SBUS output when scanning for FPort on IOMCU
+
+ - Fixed F32Lightening board IMU fast sampling issue
+
+ - fixed issue with EKF2 and EKF3 with use of high accuracy GPS modules. This is important for anyone flying with a RTK GPS
+
+ - Fixed KakuteF7 DShot glitch issue
+
+ - Fixes issue with checking for valid RC input in ICE disable channel
+
+ - fixed an interrupt flood issue with any sensor that uses interrupt timing measurement, such as RPM sensors.
+
+ - Modified RM3100 driver to problem all 4 possible I2C addresses
+
+ - Fixed UDP RC input on Linux boards to accept up to 16 RC inputs on UDP
+
+The most critical fix in the above list is the ISR flood issue.
+
+ISR Flood Issue
+---------------
+
+The ISR flood issue happens when a misbehaving external sensor (such
+as an RPM sensor for a petrol motor) starts providing pulses faster
+than the flight controller can process them. If this happens then the
+CPU can be overloaded in the interrupt handling for the sensor and
+stop flying the vehicle. The level of interrupt rate needed to cause
+this issue is around 500k interrupts per second, so to be safe we have
+added a limit of 100k interrupts per second. If a single interrupt
+source produces more than 10k interrupts in a single 0.1 second period
+then we disable that interrupt source, print a warning to the user and
+raise an internal error.
+
+Happy flying!
+
+Release 4.0.6, 7th September 2020
+---------------------------------
+
+The ArduPilot development team is proud to announce the release of
+plane 4.0.6 stable. This is a significant release with a lot of
+changes, so please read the change summary below carefully.
+
  - changed LED scripting API to allow more than 32 LEDs on a pin
  - added support for ProfiLED LEDs
  - added u-blox GPS moving baseline u-blox auto-configuration
@@ -17,8 +277,7 @@ bug fixes.
  - fixed mag variance reporting in EKF_STATUS_REPORT mavlink message
  - fixed time wrap bug in BMP085 barometer driver
  - fixed buffer overflow in ST24 RC input driver
- - fixed EKF usage of WMM tables when user has specified a specific
-   declination with COMPASS_DEC and COMPASS_AUTODEC
+ - fixed EKF usage of WMM tables when user has specified a specific declination
  - fixed bug in AP_Terrain on-disk format
  - added script for offline generation of terrain data
  - severel improvements to smbus battery drivers
@@ -40,6 +299,245 @@ bug fixes.
  - switched to new more flexible compass ordering system
  - fixed forcing of safety off on IOMCU reset
  - increased maximum compass scale factor to 1.4
+ - added RTL_CLIMB_MIN parameter for initial climb in RTL
+ - fixed disable of throttle nudge during a RC failsafe
+ - added support for a wider range of DLVR airspeed sensors
+ - fixed RC input processing for out of range RC channels
+ - added THR_FAILSAFE=2 option for flying BVLOS with only GCS failsafes enabled
+ - fixed reordering of compasses on boot based on compass priorities
+ - fixed use of minimum accuracy for GPS data in EKF2 and EKF3, fixing an issue with RTK GPS modules that report overly optimistic accuracy values
+ - fixed handling of RC_OPTION bit for disabling receiver failsafe handling
+ - fixed LOITER_TO_ALT with terrain altitude target
+ - fixed an issue with swapping UAVCAN compasses and calibration
+ - fixed use of VTOL quadplane missions (where the plane flies as a multi-rotor for auto waypoints)
+ - fixed legacy parsing of some lightware i2c lidars when beyond max range
+ - fixed RTL_AUTOLAND with MIS_RESTART=1
+ - enable more compasses on low flash boards
+ - HAL erase storage fix for flash storage boards
+ - prevent jump to circle mode in TAKEOFF if flying for less than 10s
+ - fixed handling of out of range on LightwareI2C Lidar
+ - fixed init of HoTT telemetry
+ - added support for mRo Pixracer Pro, Holybro Pix32v5
+ - added arming check for terrain data healthy if needed
+ - increased monitor thread size to 768
+ - fixed IMU fast sampling on F35Lightning board
+
+The key changes to existing behaviour to watch out for in this update
+are:
+
+USB IDs
+-------
+
+ArduPilot has now switched to it's own USB IDs for all boards. For
+most users this won't cause any change, except they may notice the
+drop down list of devices in MissionPlanner will have the ArduPilot
+flight controllers labelled more usefully as "ArduPilot" instead of
+just "STM32". If you hit issues on windows please try reinstalling the
+device drivers from this URL:
+https://firmware.ardupilot.org/Tools/MissionPlanner/driver.msi
+
+Terrain
+-------
+
+A bug fix in the format ArduPilot uses to store terrain data means
+that your flight controller will need to re-download the terrain data
+onto the sdcard via your GCS. If you fly without a GCS and you use
+terrain data then please re-download the terrain data you need by
+setting up a mission when you have internet access and allowing your
+flight controller to request terrain data from your GCS.
+
+Pressure Altitude Compensation
+------------------------------
+
+This release adds in the missing hook for the VTOL motor controller on
+a quadplane to compensate the VTOL gains using your pressure
+altitude. For most people this will not have a noticible effect, but
+some users that have tuned their aircraft for high locations may
+notice a tuning change.
+
+Compass Ordering
+----------------
+
+The new compass ordering system in this release gives a lot more
+flexibility and should preseve existing configurations and
+calibrations. If you hit issues then please have a look at the new
+compass ordering user interface in recent beta releases of
+MissionPlanner.
+
+THR_FAILSAFE=2
+--------------
+
+For people flying before visual range (with appropriate
+authorisations) there is a new option which allows for safer
+operation. By setting THR_FAILSAFE=2 you can setup the R/C failsafe so
+that R/C input will stop being used when one of the receiver failsafe
+conditions is met, while not triggering any failsafe actions. This is
+a significant improvement over setting THR_FAILSAFE=0 as it prevents
+the receiver inputs being used for stick mixing and other inputs that
+would be inappropriate when in receiver failsafe.
+
+Many thanks to everyone who contributed to and tested this release!
+
+Happy flying!
+
+Release 4.0.6beta5, 25th August 2020
+------------------------------------
+
+This should be the final beta for 4.0.6. Several important fixes are
+included:
+
+ - fixed disable of throttle nudge during a RC failsafe
+
+ - added support for a wider range of DLVR airspeed sensors
+
+ - fixed RC input processing for out of range RC channels
+
+ - added THR_FAILSAFE=2 option for flying BVLOS with only GCS
+   failsafes enabled
+
+ - fixed reordering of compasses on boot based on compass priorities
+
+ - fixed use of minimum accuracy for GPS data in EKF2 and EKF3, fixing
+   an issue with RTK GPS modules that report overly optimistic
+   accuracy values
+
+ - fixed handling of RC_OPTION bit for disabling receiver failsafe
+   handling
+
+ - fixed LOITER_TO_ALT with terrain altitude target
+
+Happy flying!
+
+Release 4.0.6beta4, 27th July 2020
+----------------------------------
+
+This is a minor change over beta3
+
+ - fixed an issue with swapping UAVCAN compasses and calibration
+
+ - fixed use of VTOL quadplane missions (where the plane flies as a
+   multi-rotor for auto waypoints)
+
+ - fixed legacy parsing of some lightware i2c lidars when beyond max
+   range
+
+Happy flying!
+
+
+Release 4.0.6beta3, 7th July 2020
+----------------------------------
+
+This is a minor change over beta2
+
+ - fixed RTL_AUTOLAND with MIS_RESTART=1
+ - enable more compasses on low flash boards
+ - HAL erase storage fix for flash storage boards
+
+Happy flying!
+
+Release 4.0.6beta2, 23rd June 2020
+----------------------------------
+
+This is a minor change over beta1
+
+ - prevent jump to circle mode in TAKEOFF if flying for less than 10s
+ - fixed handling of out of range on LightwareI2C Lidar
+ - fixed init of HoTT telemetry
+ - added support for mRo Pixracer Pro, Holybro Pix32v5
+ - added arming check for terrain data healthy if needed
+ - fixed compass ordering bug
+ - increased monitor thread size to 768
+
+Happy flying!
+
+Release 4.0.6beta1, 23rd May 2020
+---------------------------------
+
+This is a major release with a significant number of new features and
+bug fixes. You should read the list of changes and the information
+below carefully.
+
+ - changed LED scripting API to allow more than 32 LEDs on a pin
+ - added support for ProfiLED LEDs
+ - added u-blox GPS moving baseline u-blox auto-configuration
+ - fixed handling of GPS antenna positions on EKF GPS switch
+ - changed default USB IDs to new ArduPilot specific IDs
+ - fixed bug in handling trim for RC control of camera mounts
+ - added LGR_OPTIONS bits to control landing gear behaviour on takeoff/landing
+ - improved mavlink streaming output control to better allocate time to each channel
+ - fixed send of mavlink PARAM_VALUE on set of a readonly parameter
+ - fixed mag variance reporting in EKF_STATUS_REPORT mavlink message
+ - fixed time wrap bug in BMP085 barometer driver
+ - fixed buffer overflow in ST24 RC input driver
+ - fixed EKF usage of WMM tables when user has specified a specific declination
+ - fixed bug in AP_Terrain on-disk format
+ - added script for offline generation of terrain data
+ - severel improvements to smbus battery drivers
+ - fixed a race condition in parameter storage on ChibiOS
+ - fixed use of zero GNSS timestamp in UAVCAN GPS driver
+ - improved GCS messages during bootloader flash
+ - fixed CS pin in bootloader that could corrupt FRAM on some boards
+ - added GPS yaw to MAVLink GPS_RAW_INT message
+ - added Hott telemetry support
+ - added FRSky FPort support
+ - fixed bug in CAN clock and queue handling on H7 based boards
+ - added support for BRD_ALT_CONFIG for alternative hardware configs on several boards
+ - added new boards CUAV-Nora, CUAV-X7, MatekH743, R9Pilot, mRoNexus
+ - improved reporting of internal errors to GCS
+ - fixed recursion bug in tonealarm player
+ - fixed flaperon SERVO_AUTO_TRIM behaviour
+ - added option to compensate forward throttle for battery voltage
+ - added compensation in VTOL gains for pressure altitude
+ - switched to new more flexible compass ordering system
+ - fixed forcing of safety off on IOMCU reset
+ - increased maximum compass scale factor to 1.4
+ - added RTL_CLIMB_MIN parameter for initial climb in RTL
+
+The key changes to existing behaviour to watch out for in this update
+are:
+
+USB IDs
+-------
+
+ArduPilot has now switched to it's own USB IDs for all boards. For
+most users this won't cause any change, except they may notice the
+drop down list of devices in MissionPlanner will have the ArduPilot
+flight controllers labelled more usefully as "ArduPilot" instead of
+just "STM32". If you hit issues on windows please try reinstalling the
+device drivers from this URL:
+https://firmware.ardupilot.org/Tools/MissionPlanner/driver.msi
+
+Terrain
+-------
+
+A bug fix in the format ArduPilot uses to store terrain data means
+that your flight controller will need to re-download the terrain data
+onto the sdcard via your GCS. If you fly without a GCS and you use
+terrain data then please re-download the terrain data you need by
+setting up a mission when you have internet access and allowing your
+flight controller to request terrain data from your GCS.
+
+Pressure Altitude Compensation
+------------------------------
+
+This release adds in the missing hook for the VTOL motor controller on
+a quadplane to compensate the VTOL gains using your pressure
+altitude. For most people this will not have a noticible effect, but
+some users that have tuned their aircraft for high locations may
+notice a tuning change.
+
+Compass Ordering
+----------------
+
+The new compass ordering system in this release gives a lot more
+flexibility and should preseve existing configurations and
+calibrations. If you hit issues then please have a look at the new
+compass ordering user interface in recent beta releases of
+MissionPlanner.
+
+Many thanks to everyone who contributed to and tested this release!
+
+Happy flying!
 
 
 Release 4.0.5, 4th March 2020
@@ -1970,7 +2468,7 @@ for 3 new flight boards in this release. They are:
  - the Pixracer
 
 More information about the list of supported boards is available here:
-http://dev.ardupilot.org/wiki/supported-autopilot-controller-boards/
+https://ardupilot.org/copter/docs/common-autopilots.html
 
 Startup on a moving platform
 

@@ -35,6 +35,15 @@ void *malloc_sdcard_dma(size_t size);
 void *malloc_fastmem(size_t size);
 thread_t *thread_create_alloc(size_t size, const char *name, tprio_t prio, tfunc_t pf, void *arg);
 
+struct memory_region {
+    void *address;
+    uint32_t size;
+    uint32_t flags;
+};
+#if CH_CFG_USE_HEAP == TRUE
+uint8_t malloc_get_heaps(memory_heap_t **_heaps, const struct memory_region **regions);
+#endif
+
 // flush all dcache
 void memory_flush_all(void);
     
@@ -46,7 +55,10 @@ uint64_t stm32_get_utc_usec(void);
 uint32_t get_fattime(void);
 
 // one-time programmable area
-#if defined(STM32F4)
+#if defined(FLASH_OTP_BASE)
+#define OTP_BASE FLASH_OTP_BASE
+#define OTP_SIZE (FLASH_OTP_END-FLASH_OTP_BASE)
+#elif defined(STM32F4)
 #define OTP_BASE 0x1fff7800
 #define OTP_SIZE 512
 #elif defined(STM32F7)
@@ -78,7 +90,7 @@ void malloc_init(void);
   read mode of a pin. This allows a pin config to be read, changed and
   then written back
  */
-#if defined(STM32F7) || defined(STM32H7) || defined(STM32F4) || defined(STM32F3)
+#if defined(STM32F7) || defined(STM32H7) || defined(STM32F4) || defined(STM32F3) || defined(STM32G4)
 iomode_t palReadLineMode(ioline_t line);
 
 enum PalPushPull {
@@ -109,7 +121,19 @@ void system_halt_hook(void);
 
 // hook for stack overflow
 void stack_overflow(thread_t *tp);
-    
+
+/*
+  check how much stack is free given a stack base. Assumes the fill
+  byte is 0x55
+ */
+uint32_t stack_free(void *stack_base);
+
+// allow stack view code to show free ISR stack
+extern uint32_t __main_stack_base__;
+extern uint32_t __main_stack_end__;
+extern uint32_t __main_thread_stack_base__;
+extern uint32_t __main_thread_stack_end__;
+
 #ifdef __cplusplus
 }
 #endif

@@ -62,7 +62,7 @@ bool ModeAutorotate::init(bool ignore_checks)
     phase_switch = Autorotation_Phase::ENTRY;
 
     // Set entry timer
-    _entry_time_start = millis();
+    _entry_time_start_ms = millis();
 
     // The decay rate to reduce the head speed from the current to the target
     _hs_decay = ((_initial_rpm/g2.arot.get_hs_set_point()) - HEAD_SPEED_TARGET_RATIO) / AUTOROTATE_ENTRY_TIME;
@@ -83,7 +83,7 @@ void ModeAutorotate::run()
     }
 
     // Current time
-    now = millis(); //milliseconds
+    uint32_t now = millis(); //milliseconds
 
     // Initialise internal variables
     float curr_vel_z = inertial_nav.get_velocity().z;   // Current vertical descent
@@ -98,7 +98,7 @@ void ModeAutorotate::run()
     // Timer from entry phase to progress to glide phase
     if (phase_switch == Autorotation_Phase::ENTRY){
 
-        if ((now - _entry_time_start)/1000.0f > AUTOROTATE_ENTRY_TIME) {
+        if ((now - _entry_time_start_ms)/1000.0f > AUTOROTATE_ENTRY_TIME) {
             // Flight phase can be progressed to steady state glide
             phase_switch = Autorotation_Phase::SS_GLIDE;
         }
@@ -214,52 +214,50 @@ void ModeAutorotate::run()
                 _bail_time = MAX(g2.arot.get_bail_time(),BAILOUT_MOTOR_RAMP_TIME+0.1f);
 
                 // Set bail out start time
-                _bail_time_start = now;
+                _bail_time_start_ms = now;
 
                 // Set initial target vertical speed
                 _desired_v_z = curr_vel_z;
 
                 // Initialise position and desired velocity
                 if (!pos_control->is_active_z()) {
-                    pos_control->relax_alt_hold_controllers(g2.arot.get_last_collective());
+                    pos_control->relax_z_controller(g2.arot.get_last_collective());
                 }
 
                 // Get pilot parameter limits
                 const float pilot_spd_dn = -get_pilot_speed_dn();
                 const float pilot_spd_up = g.pilot_speed_up;
 
-                // Set speed limit
-                pos_control->set_max_speed_z(curr_vel_z, pilot_spd_up);
-
                 float pilot_des_v_z = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
                 pilot_des_v_z = constrain_float(pilot_des_v_z, pilot_spd_dn, pilot_spd_up);
 
-                // Calculate target climb rate adjustment to transition from bail out decent speed to requested climb rate on stick.
+                // Calculate target climb rate adjustment to transition from bail out descent speed to requested climb rate on stick.
                 _target_climb_rate_adjust = (curr_vel_z - pilot_des_v_z)/(_bail_time - BAILOUT_MOTOR_RAMP_TIME); //accounting for 0.5s motor spool time
 
                 // Calculate pitch target adjustment rate to return to level
                 _target_pitch_adjust = _pitch_target/_bail_time;
 
-                // Set acceleration limit
-                pos_control->set_max_accel_z(abs(_target_climb_rate_adjust));
+                // set vertical speed and acceleration limits
+                pos_control->set_max_speed_accel_z(curr_vel_z, pilot_spd_up, fabsf(_target_climb_rate_adjust));
+                pos_control->set_correction_speed_accel_z(curr_vel_z, pilot_spd_up, fabsf(_target_climb_rate_adjust));
 
                 motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
 
                 _flags.bail_out_initial = 0;
             }
 
-        if ((now - _bail_time_start)/1000.0f >= BAILOUT_MOTOR_RAMP_TIME) {
+        if ((now - _bail_time_start_ms)/1000.0f >= BAILOUT_MOTOR_RAMP_TIME) {
             // Update desired vertical speed and pitch target after the bailout motor ramp timer has completed
             _desired_v_z -= _target_climb_rate_adjust*G_Dt;
             _pitch_target -= _target_pitch_adjust*G_Dt;
         }
         // Set position controller
-        pos_control->set_alt_target_from_climb_rate(_desired_v_z, G_Dt, false);
+        pos_control->set_pos_target_z_from_climb_rate_cm(_desired_v_z);
 
         // Update controllers
         pos_control->update_z_controller();
 
-        if ((now - _bail_time_start)/1000.0f >= _bail_time) {
+        if ((now - _bail_time_start_ms)/1000.0f >= _bail_time) {
             // Bail out timer complete.  Change flight mode. Do not revert back to auto. Prevent aircraft
             // from continuing mission and potentially flying further away after a power failure.
             if (copter.prev_control_mode == Mode::Number::AUTO) {

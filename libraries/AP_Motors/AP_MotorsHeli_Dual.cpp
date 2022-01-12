@@ -30,7 +30,7 @@ const AP_Param::GroupInfo AP_MotorsHeli_Dual::var_info[] = {
     // @Param: DUAL_MODE
     // @DisplayName: Dual Mode
     // @Description: Sets the dual mode of the heli, either as tandem or as transverse.
-    // @Values: 0:Longitudinal, 1:Transverse
+    // @Values: 0:Longitudinal, 1:Transverse, 2:Intermeshing
     // @User: Standard
     AP_GROUPINFO("DUAL_MODE", 9, AP_MotorsHeli_Dual, _dual_mode, AP_MOTORS_HELI_DUAL_MODE_TANDEM),
 
@@ -43,7 +43,7 @@ const AP_Param::GroupInfo AP_MotorsHeli_Dual::var_info[] = {
 
     // @Param: DCP_YAW
     // @DisplayName: Differential-Collective-Pitch Yaw Mixing
-    // @Description: Feed-forward compensation to automatically add yaw input when differential collective pitch is applied.
+    // @Description: Feed-forward compensation to automatically add yaw input when differential collective pitch is applied.  Disabled for intermeshing mode.
     // @Range: -10 10
     // @Increment: 0.1
     // @User: Standard
@@ -204,6 +204,14 @@ const AP_Param::GroupInfo AP_MotorsHeli_Dual::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("DCP_TRIM", 22, AP_MotorsHeli_Dual, _dcp_trim, 0.0f),
 
+    // @Param: YAW_REV_EXPO
+    // @DisplayName: Yaw reverser expo
+    // @Description: For intermeshing mode only. Yaw revereser smoothing exponent, smoothen transition near zero collective region. Increase this parameter to shink smoothing range. Set to -1 to disable reverser. 
+    // @Range: -1 1000
+    // @Increment: 1.0
+    // @User: Standard
+    AP_GROUPINFO("YAW_REV_EXPO", 23, AP_MotorsHeli_Dual, _yaw_rev_expo, -1),
+
     AP_GROUPEND
 };
 
@@ -231,7 +239,7 @@ void AP_MotorsHeli_Dual::set_update_rate( uint16_t speed_hz )
 // init_outputs
 bool AP_MotorsHeli_Dual::init_outputs()
 {
-    if (!_flags.initialised_ok) {
+    if (!initialised_ok()) {
         // make sure 6 output channels are mapped
         for (uint8_t i=0; i<AP_MOTORS_HELI_DUAL_NUM_SWASHPLATE_SERVOS; i++) {
             add_motor_num(CH_1+i);
@@ -248,6 +256,13 @@ bool AP_MotorsHeli_Dual::init_outputs()
 
     }
 
+    // set signal value for main rotor external governor to know when to use autorotation bailout ramp up
+    if (_main_rotor._rsc_mode.get() == ROTOR_CONTROL_MODE_SPEED_SETPOINT  ||  _main_rotor._rsc_mode.get() == ROTOR_CONTROL_MODE_SPEED_PASSTHROUGH) {
+        _main_rotor.set_ext_gov_arot_bail(_main_rotor._ext_gov_arot_pct.get());
+    } else {
+        _main_rotor.set_ext_gov_arot_bail(0);
+    }
+
     // reset swash servo range and endpoints
     for (uint8_t i=0; i<AP_MOTORS_HELI_DUAL_NUM_SWASHPLATE_SERVOS; i++) {
         reset_swash_servo(SRV_Channels::get_motor_function(i));
@@ -259,7 +274,7 @@ bool AP_MotorsHeli_Dual::init_outputs()
         reset_swash_servo(SRV_Channels::get_motor_function(7));
     }
 
-    _flags.initialised_ok = true;
+    set_initialised_ok(true);
 
     return true;
 }
@@ -336,13 +351,19 @@ void AP_MotorsHeli_Dual::calculate_armed_scalars()
         gcs().send_text(MAV_SEVERITY_CRITICAL, "RSC control mode change failed");
     }
     // saves rsc mode parameter when disarmed if it had been reset while armed
-    if (_heliflags.save_rsc_mode && !_flags.armed) {
+    if (_heliflags.save_rsc_mode && !armed()) {
         _main_rotor._rsc_mode.save();
         _heliflags.save_rsc_mode = false;
     }
 
     // set bailout ramp time
     _main_rotor.use_bailout_ramp_time(_heliflags.enable_bailout);
+
+    // allow use of external governor autorotation bailout window on main rotor
+    if (_main_rotor._ext_gov_arot_pct.get() > 0  &&  (_main_rotor._rsc_mode.get() == ROTOR_CONTROL_MODE_SPEED_SETPOINT  ||  _main_rotor._rsc_mode.get() == ROTOR_CONTROL_MODE_SPEED_PASSTHROUGH)){
+        // RSC only needs to know that the vehicle is in an autorotation if using the bailout window on an external governor
+        _main_rotor.set_autorotation_flag(_heliflags.in_autorotation);
+    }
 }
 
 // calculate_scalars
@@ -408,6 +429,29 @@ float AP_MotorsHeli_Dual::get_swashplate (int8_t swash_num, int8_t swash_axis, f
                 swash_tilt = -0.45f * _dcp_scaler * (roll_input + constrain_float(_dcp_trim, -0.2f, 0.2f)) + coll_input;
             }
         }
+    } else if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_INTERMESHING) {
+        // roll tilt
+        if (swash_axis == AP_MOTORS_HELI_DUAL_SWASH_AXIS_ROLL) {
+            if (swash_num == 1) {
+                swash_tilt = roll_input;
+            } else if (swash_num == 2) {
+                swash_tilt = roll_input;
+            }
+        } else if (swash_axis == AP_MOTORS_HELI_DUAL_SWASH_AXIS_PITCH) {
+        // pitch tilt
+            if (swash_num == 1) {
+                swash_tilt = pitch_input - _yaw_scaler * yaw_input;
+            } else if (swash_num == 2) {
+                swash_tilt = pitch_input + _yaw_scaler * yaw_input;
+            }
+        } else if (swash_axis == AP_MOTORS_HELI_DUAL_SWASH_AXIS_COLL) {
+        // collective
+            if (swash_num == 1) {
+                swash_tilt = 0.45f * _dcp_scaler * yaw_input + coll_input;
+            } else if (swash_num == 2) {
+                swash_tilt = -0.45f * _dcp_scaler * yaw_input + coll_input;
+            }
+        }
     } else { // AP_MOTORS_HELI_DUAL_MODE_TANDEM
         // roll tilt
         if (swash_axis == AP_MOTORS_HELI_DUAL_SWASH_AXIS_ROLL) {
@@ -462,10 +506,10 @@ void AP_MotorsHeli_Dual::update_motor_control(RotorControlState state)
 
     if (state == ROTOR_CONTROL_STOP) {
         // set engine run enable aux output to not run position to kill engine when disarmed
-        SRV_Channels::set_output_limit(SRV_Channel::k_engine_run_enable, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+        SRV_Channels::set_output_limit(SRV_Channel::k_engine_run_enable, SRV_Channel::Limit::MIN);
     } else {
         // else if armed, set engine run enable output to run position
-        SRV_Channels::set_output_limit(SRV_Channel::k_engine_run_enable, SRV_Channel::SRV_CHANNEL_LIMIT_MAX);
+        SRV_Channels::set_output_limit(SRV_Channel::k_engine_run_enable, SRV_Channel::Limit::MAX);
     }
 
     // Check if rotors are run-up
@@ -486,7 +530,7 @@ void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float c
     limit.throttle_lower = false;
     limit.throttle_upper = false;
 
-    if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_TRANSVERSE) {
+    if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_TRANSVERSE || _dual_mode == AP_MOTORS_HELI_DUAL_MODE_INTERMESHING) {
         if (pitch_out < -_cyclic_max/4500.0f) {
             pitch_out = -_cyclic_max/4500.0f;
             limit.pitch = true;
@@ -510,29 +554,6 @@ void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float c
 
     if (_heliflags.inverted_flight) {
         collective_in = 1 - collective_in;
-    }
-
-    float yaw_compensation = 0.0f;
-
-    // if servo output not in manual mode, process pre-compensation factors
-    if (_servo_mode == SERVO_CONTROL_MODE_AUTOMATED) {
-        // add differential collective pitch yaw compensation
-        if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_TRANSVERSE) {
-            yaw_compensation = _dcp_yaw_effect * roll_out;
-        } else { // AP_MOTORS_HELI_DUAL_MODE_TANDEM
-            yaw_compensation = _dcp_yaw_effect * pitch_out;
-        }
-        yaw_out = yaw_out + yaw_compensation;
-    }
-
-    // scale yaw and update limits
-    if (yaw_out < -_cyclic_max/4500.0f) {
-        yaw_out = -_cyclic_max/4500.0f;
-        limit.yaw = true;
-    }
-    if (yaw_out > _cyclic_max/4500.0f) {
-        yaw_out = _cyclic_max/4500.0f;
-        limit.yaw = true;
     }
 
     // constrain collective input
@@ -566,6 +587,38 @@ void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float c
     float collective2_out = collective_out;
     if (_servo_mode == SERVO_CONTROL_MODE_MANUAL_CENTER) {
         collective2_out = _collective2_mid_pct;
+    }
+
+    // if servo output not in manual mode, process pre-compensation factors
+    if (_servo_mode == SERVO_CONTROL_MODE_AUTOMATED) {
+        // add differential collective pitch yaw compensation
+        float yaw_compensation = 0.0f;
+
+        if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_INTERMESHING) {
+            // for intermeshing, reverse yaw in negative collective region and smoothen transition near zero collective
+            if (_yaw_rev_expo > 0.01f) {
+                // yaw_compensation range: (-1,1) S-shaped curve (Logistic Model) 1/(1 + e^kt)
+                yaw_compensation = 1.0f - (2.0f / (1.0f + powf(2.7182818f , _yaw_rev_expo * (collective_out-_collective_mid_pct))));
+                yaw_out = yaw_out * yaw_compensation;
+            }
+        } else {
+            if (_dual_mode == AP_MOTORS_HELI_DUAL_MODE_TRANSVERSE) {
+                yaw_compensation = _dcp_yaw_effect * roll_out;
+            } else { // AP_MOTORS_HELI_DUAL_MODE_TANDEM
+                yaw_compensation = _dcp_yaw_effect * pitch_out;
+            }
+            yaw_out = yaw_out + yaw_compensation;
+        }
+    }
+
+    // scale yaw and update limits
+    if (yaw_out < -_cyclic_max/4500.0f) {
+        yaw_out = -_cyclic_max/4500.0f;
+        limit.yaw = true;
+    }
+    if (yaw_out > _cyclic_max/4500.0f) {
+        yaw_out = _cyclic_max/4500.0f;
+        limit.yaw = true;
     }
 
     // scale collective pitch for front swashplate (servos 1,2,3)
@@ -608,7 +661,7 @@ void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float c
 
 void AP_MotorsHeli_Dual::output_to_motors()
 {
-    if (!_flags.initialised_ok) {
+    if (!initialised_ok()) {
         return;
     }
     // actually move the servos.  PWM is sent based on nominal 1500 center.  servo output shifts center based on trim value.

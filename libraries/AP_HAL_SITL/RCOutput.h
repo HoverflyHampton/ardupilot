@@ -1,8 +1,9 @@
 #pragma once
 
 #include <AP_HAL/AP_HAL.h>
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL && !defined(HAL_BUILD_AP_PERIPH)
 #include "AP_HAL_SITL.h"
+#include <AP_ESC_Telem/AP_ESC_Telem_SITL.h>
 
 class HALSITL::RCOutput : public AP_HAL::RCOutput {
 public:
@@ -19,6 +20,15 @@ public:
     void push(void) override;
 
     /*
+      force the safety switch on, disabling PWM output from the IO board
+     */
+    bool force_safety_on(void) override;
+    /*
+      force the safety switch off, enabling PWM output from the IO board
+     */
+    void force_safety_off(void) override;
+
+    /*
       Serial LED emulation
      */
     bool set_serial_led_num_LEDs(const uint16_t chan, uint8_t num_leds, output_mode mode = MODE_PWM_NONE, uint16_t clock_mask = 0) override;
@@ -27,6 +37,8 @@ public:
     
 private:
     SITL_State *_sitlState;
+    AP_ESC_Telem_SITL *esc_telem;
+
     uint16_t _freq_hz;
     uint16_t _enable_mask;
     bool _corked;

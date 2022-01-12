@@ -31,12 +31,17 @@
 #include "support.h"
 #include "bl_protocol.h"
 #include "can.h"
+#include <stdio.h>
 
 extern "C" {
     int main(void);
 }
 
-struct boardinfo board_info;
+struct boardinfo board_info = {
+    .board_type = APJ_BOARD_ID,
+    .board_rev = 0,
+    .fw_size = (BOARD_FLASH_SIZE - (FLASH_BOOTLOADER_LOAD_KB + FLASH_RESERVE_END_KB + APP_START_OFFSET_KB))*1024
+};
 
 #ifndef HAL_BOOTLOADER_TIMEOUT
 #define HAL_BOOTLOADER_TIMEOUT 5000
@@ -48,11 +53,8 @@ struct boardinfo board_info;
 
 int main(void)
 {
-    board_info.board_type = APJ_BOARD_ID;
-    board_info.board_rev = 0;
-    board_info.fw_size = (BOARD_FLASH_SIZE - FLASH_BOOTLOADER_LOAD_KB)*1024;
     if (BOARD_FLASH_SIZE > 1024 && check_limit_flash_1M()) {
-        board_info.fw_size = (1024 - FLASH_BOOTLOADER_LOAD_KB)*1024;        
+        board_info.fw_size = (1024 - (FLASH_BOOTLOADER_LOAD_KB + APP_START_OFFSET_KB))*1024;
     }
 
     bool try_boot = false;
@@ -68,7 +70,8 @@ int main(void)
 
 #ifndef NO_FASTBOOT
     enum rtc_boot_magic m = check_fast_reboot();
-    if (stm32_was_watchdog_reset()) {
+    bool was_watchdog = stm32_was_watchdog_reset();
+    if (was_watchdog) {
         try_boot = true;
         timeout = 0;
     } else if (m == RTC_BOOT_HOLD) {
@@ -77,7 +80,7 @@ int main(void)
         try_boot = true;
         timeout = 0;
     }
-#if HAL_USE_CAN == TRUE
+#if HAL_USE_CAN == TRUE || HAL_NUM_CAN_IFACES
     else if ((m & 0xFFFFFF00) == RTC_BOOT_CANBL) {
         try_boot = false;
         timeout = 10000;
@@ -88,13 +91,32 @@ int main(void)
         // bad firmware CRC, don't try and boot
         timeout = 0;
         try_boot = false;
-    } else if (timeout != 0) {
+    }
+#ifndef BOOTLOADER_DEV_LIST
+    else if (timeout != 0) {
         // fast boot for good firmware
         try_boot = true;
         timeout = 1000;
     }
 #endif
-    
+    if (was_watchdog && m != RTC_BOOT_FWOK) {
+        // we've had a watchdog within 30s of booting main CAN
+        // firmware. We will stay in bootloader to allow the user to
+        // load a fixed firmware
+        stm32_watchdog_clear_reason();
+        try_boot = false;
+        timeout = 0;
+    }
+#endif
+#if defined(HAL_GPIO_PIN_VBUS) && defined(HAL_ENABLE_VBUS_CHECK)
+#if HAL_USE_SERIAL_USB == TRUE
+    else if (palReadLine(HAL_GPIO_PIN_VBUS) == 0)  {
+        try_boot = true;
+        timeout = 0;
+    }
+#endif
+#endif
+
     // if we fail to boot properly we want to pause in bootloader to give
     // a chance to load new app code
     set_fast_reboot(RTC_BOOT_OFF);
@@ -115,7 +137,7 @@ int main(void)
 #if defined(BOOTLOADER_DEV_LIST)
     init_uarts();
 #endif
-#if HAL_USE_CAN == TRUE
+#if HAL_USE_CAN == TRUE || HAL_NUM_CAN_IFACES
     can_start();
 #endif
     flash_init();

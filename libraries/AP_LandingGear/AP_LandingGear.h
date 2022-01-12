@@ -1,5 +1,5 @@
-/// @file	AP_LandingGear.h
-/// @brief	Landing gear control library
+/// @file   AP_LandingGear.h
+/// @brief  Landing gear control library
 #pragma once
 
 #include <AP_Param/AP_Param.h>
@@ -13,8 +13,8 @@
 #define DEFAULT_PIN_WOW_POL 0
 #endif
 
-/// @class	AP_LandingGear
-/// @brief	Class managing the control of landing gear
+/// @class  AP_LandingGear
+/// @brief  Class managing the control of landing gear
 class AP_LandingGear {
 public:
     AP_LandingGear() {
@@ -76,8 +76,8 @@ public:
     /// set landing gear position to retract, deploy or deploy-and-keep-deployed
     void set_position(LandingGearCommand cmd);
     
-    uint32_t get_gear_state_duration_ms();
-    uint32_t get_wow_state_duration_ms();
+    uint32_t get_gear_state_duration_ms() const;
+    uint32_t get_wow_state_duration_ms() const;
 
     static const struct AP_Param::GroupInfo        var_info[];
     
