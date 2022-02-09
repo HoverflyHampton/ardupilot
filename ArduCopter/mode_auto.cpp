@@ -207,12 +207,9 @@ void ModeAuto::takeoff_start(const Location& dest_loc)
     }
 
     // sanity check target
-    if (alt_target < copter.current_loc.alt) {
-        dest.set_alt_cm(copter.current_loc.alt, Location::AltFrame::ABOVE_HOME);
-    }
-    // Note: if taking off from below home this could cause a climb to an unexpectedly high altitude
-    if (alt_target < 100) {
-        dest.set_alt_cm(100, Location::AltFrame::ABOVE_HOME);
+    int32_t alt_target_min_cm = copter.current_loc.alt + (copter.ap.land_complete ? 100 : 0);
+    if (alt_target < alt_target_min_cm ) {
+        dest.set_alt_cm(alt_target_min_cm , Location::AltFrame::ABOVE_HOME);
     }
 
     // set waypoint controller target
@@ -552,6 +549,55 @@ void ModeAuto::exit_mission()
         // if we've landed it's safe to disarm
         copter.arming.disarm(AP_Arming::Method::MISSIONEXIT);
     }
+}
+
+// detect external changes to mission
+bool ModeAuto::check_for_mission_change()
+{
+    // check if mission has been updated
+    const uint32_t change_time_ms = mission.last_change_time_ms();
+    const bool update_time_changed = (change_time_ms != mis_change_detect.last_change_time_ms);;
+
+    // check if active command index has changed
+    const uint16_t curr_cmd_idx = mission.get_current_nav_index();
+    const bool curr_cmd_idx_changed = (curr_cmd_idx != mis_change_detect.curr_cmd_index);
+
+    // no changes if neither mission update time nor active command index has changed
+    if (!update_time_changed && !curr_cmd_idx_changed) {
+        return false;
+    }
+
+    // the mission has been updated (but maybe not changed) and/or the current command index has changed
+    // check the contents of the next three commands to ensure they have not changed
+    // and update storage so we can detect future changes
+
+    bool cmds_changed = false;  // true if upcoming command contents have changed
+
+    // retrieve cmds from mission and compare with mis_change_detect
+    uint8_t num_cmds = 0;
+    uint16_t cmd_idx = curr_cmd_idx;
+    AP_Mission::Mission_Command cmd[mis_change_detect_cmd_max];
+    while ((num_cmds < ARRAY_SIZE(cmd)) && mission.get_next_nav_cmd(cmd_idx, cmd[num_cmds])) {
+        num_cmds++;
+        if ((num_cmds > mis_change_detect.cmd_count) || (cmd[num_cmds-1] != mis_change_detect.cmd[num_cmds-1])) {
+            cmds_changed = true;
+            mis_change_detect.cmd[num_cmds-1] = cmd[num_cmds-1];
+        }
+        cmd_idx = cmd[num_cmds-1].index+1;
+    }
+
+    // mission has changed if number of upcoming commands does not match mis_change_detect
+    if (num_cmds != mis_change_detect.cmd_count) {
+        cmds_changed = true;
+    }
+
+    // update mis_change_detect with last change time, command index and number of commands
+    mis_change_detect.last_change_time_ms = change_time_ms;
+    mis_change_detect.curr_cmd_index = curr_cmd_idx;
+    mis_change_detect.cmd_count = num_cmds;
+
+    // mission has changed if upcoming command contents have changed without the current command index changing
+    return cmds_changed && !curr_cmd_idx_changed;
 }
 
 // detect external changes to mission
@@ -979,6 +1025,7 @@ void ModeAuto::loiter_to_alt_run()
         pos_control->get_pos_z_p().kP(),
         pos_control->get_max_accel_z_cmss(),
         G_Dt);
+    target_climb_rate = constrain_float(target_climb_rate, pos_control->get_max_speed_down_cms(), pos_control->get_max_speed_up_cms());
 
     // get avoidance adjusted climb rate
     target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);

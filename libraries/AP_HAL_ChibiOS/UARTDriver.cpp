@@ -635,7 +635,7 @@ void UARTDriver::set_blocking_writes(bool blocking)
     _blocking_writes = blocking;
 }
 
-bool UARTDriver::tx_pending() { return false; }
+bool UARTDriver::tx_pending() { return _writebuf.available() > 0; }
 
 /* Empty implementations of Stream virtual methods */
 uint32_t UARTDriver::available() {
@@ -1110,9 +1110,18 @@ void UARTDriver::write_pending_bytes(void)
             // remaining queue space
             uint32_t space = qSpaceI(&((SerialDriver*)sdef.serial)->oqueue);
             uint32_t used = SERIAL_BUFFERS_SIZE - space;
+
+#if !defined(USART_CR1_FIFOEN)
             // threshold is 8 for the GCS_Common code to unstick SiK radios, which
             // sends 6 bytes with flow control disabled
             const uint8_t threshold = 8;
+#else
+            // account for TX FIFO buffer
+            uint8_t threshold = 12;
+            if (_last_options & OPTION_NOFIFO) {
+                threshold = 8;
+            }
+#endif
             if (_total_written > used && _total_written - used > threshold) {
                 _flow_control = FLOW_CONTROL_ENABLE;
                 return;
@@ -1287,6 +1296,24 @@ void UARTDriver::_tx_timer_tick(void)
             sdStart(sd, &sercfg);
         }
     }
+    if (sdef.is_usb) {
+#ifdef HAVE_USB_SERIAL
+        ((GPIO *)hal.gpio)->set_usb_connected();
+#endif
+    }
+
+    // half duplex we do reads in the write thread
+    if (half_duplex) {
+        _in_rx_timer = true;
+        read_bytes_NODMA();
+        if (_wait.thread_ctx && _readbuf.available() >= _wait.n) {
+            chEvtSignal(_wait.thread_ctx, EVT_DATA);
+        }
+        _in_rx_timer = false;
+    }
+
+    // now do the write
+    write_pending_bytes();
 
     // don't try IO on a disconnected USB port
     if (sdef.is_usb) {
