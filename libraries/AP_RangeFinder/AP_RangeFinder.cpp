@@ -533,7 +533,6 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
         if (AP_RangeFinder_Lanbao::detect(serial_instance)) {
             _add_backend(new AP_RangeFinder_Lanbao(state[instance], params[instance]), instance, serial_instance++);
         }
-#endif // HAL_MSP_RANGEFINDER_ENABLED
         break;
     case Type::LeddarVu8_Serial:
         if (AP_RangeFinder_LeddarVu8::detect(serial_instance)) {
@@ -805,9 +804,9 @@ RangeFinder *RangeFinder::_singleton;
 
 namespace AP {
 
-RangeFinder *rangefinder()
-{
-    return RangeFinder::get_singleton();
-}
+    RangeFinder *rangefinder()
+    {
+        return RangeFinder::get_singleton();
+    }
 
 }

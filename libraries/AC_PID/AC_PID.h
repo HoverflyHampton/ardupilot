@@ -119,12 +119,6 @@ public:
     // return current slew rate of slew limiter. Will return 0 if SMAX is zero
     float get_slew_rate(void) const { return _slew_limiter.get_slew_rate(); }
 
-    // set slew limiter scale factor
-    void set_slew_limit_scale(int8_t scale) { _slew_limit_scale = scale; }
-
-    // return current slew rate of slew limiter. Will return 0 if SMAX is zero
-    float get_slew_rate(void) const { return _slew_limiter.get_slew_rate(); }
-
     const AP_Logger::PID_Info& get_pid_info(void) const { return _pid_info; }
 
     // parameter var table

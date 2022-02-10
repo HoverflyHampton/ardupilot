@@ -1066,28 +1066,6 @@ bool RC_Channel::do_aux_function(const aux_func_t ch_option, const AuxSwitchPos 
         break;
     }
 
-    case AUX_FUNC::GPS_DISABLE_YAW:
-        AP::gps().set_force_disable_yaw(ch_flag == AuxSwitchPos::HIGH);
-        break;
-
-    case AUX_FUNC::DISABLE_AIRSPEED_USE: {
-        AP_Airspeed *airspeed = AP::airspeed();
-        if (airspeed == nullptr) {
-            break;
-        }
-        switch (ch_flag) {
-        case AuxSwitchPos::HIGH:
-            airspeed->force_disable_use(true);
-            break;
-        case AuxSwitchPos::MIDDLE:
-            break;
-        case AuxSwitchPos::LOW:
-            airspeed->force_disable_use(false);
-            break;
-        }
-        break;
-    }
-
     case AUX_FUNC::MOTOR_ESTOP:
         switch (ch_flag) {
         case AuxSwitchPos::HIGH: {
