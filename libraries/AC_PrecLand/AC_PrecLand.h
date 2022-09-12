@@ -184,7 +184,7 @@ private:
 
     PosVelEKF                   _ekf_x, _ekf_y;     // Kalman Filter for x and y axis
     uint32_t                    _outlier_reject_count;  // mini-EKF's outlier counter (3 consecutive outliers lead to EKF accepting updates)
-
+    AP_Int32                    _max_outlier_reject_count; // mini-EKF's max outlier before accepting values
     Vector3f                    _target_pos_rel_meas_NED; // target's relative position as 3D vector
 
     Vector3f                    _last_target_pos_rel_origin_NED;  // stores the last known location of the target horizontally, and the height of the vehicle where it detected this target in meters NED
