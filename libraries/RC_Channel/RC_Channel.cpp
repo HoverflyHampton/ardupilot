@@ -224,6 +224,12 @@ int16_t RC_Channel::pwm_to_range_dz(uint16_t _dead_zone) const
 {
     int16_t r_in = constrain_int16(radio_in, radio_min.get(), radio_max.get());
 
+    if((ch_in == 0 || ch_in == 1) && 
+        (radio_in > radio_max.get() || radio_in < radio_min.get()))
+    {
+        r_in = (radio_max.get() + radio_min.get()) / 2;
+    }
+
     if (reversed) {
 	    r_in = radio_max.get() - (r_in - radio_min.get());
     }
