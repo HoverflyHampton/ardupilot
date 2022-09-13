@@ -111,7 +111,7 @@ const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
     // @Increment: 1
     // @Units: N/A
     // @User: Advanced
-    // @RebootRequired: True
+    // @RebootRequired: False
     AP_GROUPINFO("OUT_REJ", 10, AC_PrecLand, _max_outlier_reject_count, 3),
     AP_GROUPEND
 };
