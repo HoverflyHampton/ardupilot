@@ -104,6 +104,15 @@ const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO("LAG", 9, AC_PrecLand, _lag, 0.02f), // 20ms is the old default buffer size (8 frames @ 400hz/2.5ms)
 
+    // @Param: OUT_REJ
+    // @DisplayName: Outlier Reject Count
+    // @Description: The number of outlier data samples before accepting outliers
+    // @Range: 1 50
+    // @Increment: 1
+    // @Units: N/A
+    // @User: Advanced
+    // @RebootRequired: False
+    AP_GROUPINFO("OUT_REJ", 10, AC_PrecLand, _max_outlier_reject_count, 3),
     AP_GROUPEND
 };
 
