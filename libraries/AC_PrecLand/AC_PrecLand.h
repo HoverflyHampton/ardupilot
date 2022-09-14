@@ -131,7 +131,7 @@ private:
 
     PosVelEKF                   _ekf_x, _ekf_y;     // Kalman Filter for x and y axis
     uint32_t                    _outlier_reject_count;  // mini-EKF's outlier counter (3 consecutive outliers lead to EKF accepting updates)
-    
+    AP_Float                    _max_outlier_reject_value; // mini-EKF's max value to be considered an outlier
     Vector3f                    _target_pos_rel_meas_NED; // target's relative position as 3D vector
 
     Vector2f                    _target_pos_rel_est_NE; // target's position relative to the IMU, not compensated for lag
