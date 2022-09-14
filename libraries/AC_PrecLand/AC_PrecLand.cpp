@@ -106,13 +106,13 @@ const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
 
     // @Param: OUT_REJ
     // @DisplayName: Outlier Reject Count
-    // @Description: The number of outlier data samples before accepting outliers
-    // @Range: 1 50
-    // @Increment: 1
+    // @Description: The maximum value of an ekf datapoint before it is considered an outlier
+    // @Range: 1 1000
+    // @Increment: 0.1
     // @Units: N/A
     // @User: Advanced
     // @RebootRequired: False
-    AP_GROUPINFO("OUT_REJ", 10, AC_PrecLand, _max_outlier_reject_count, 3),
+    AP_GROUPINFO("OUT_REJ", 10, AC_PrecLand, _max_outlier_reject_value, 3.0f),
     AP_GROUPEND
 };
 
@@ -339,7 +339,7 @@ void AC_PrecLand::run_estimator(float rangefinder_alt_m, bool rangefinder_alt_va
                 } else {
                     float NIS_x = _ekf_x.getPosNIS(_target_pos_rel_meas_NED.x, xy_pos_var);
                     float NIS_y = _ekf_y.getPosNIS(_target_pos_rel_meas_NED.y, xy_pos_var);
-                    if (MAX(NIS_x, NIS_y) < 3.0f || _outlier_reject_count >= _max_outlier_reject_count) {
+                    if (MAX(NIS_x, NIS_y) < _max_outlier_reject_value || _outlier_reject_count >= 3) {
                         _outlier_reject_count = 0;
                         _ekf_x.fusePos(_target_pos_rel_meas_NED.x, xy_pos_var);
                         _ekf_y.fusePos(_target_pos_rel_meas_NED.y, xy_pos_var);
