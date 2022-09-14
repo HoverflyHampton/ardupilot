@@ -374,6 +374,8 @@ public:
         // 254,255: reserved
 
         // the k_param_* space is 9-bits in size
+        // 400 - HF Parameters
+        k_param_comm_timeout_s = 400,
         // 511: reserved
     };
 
@@ -464,6 +466,10 @@ public:
     AP_Float                acro_balance_pitch;
     AP_Int8                 acro_trainer;
     AP_Float                acro_rp_expo;
+
+
+    // HF Parameters
+    AP_Float                comm_timeout_s;
 
     // Note: keep initializers here in the same order as they are declared
     // above.

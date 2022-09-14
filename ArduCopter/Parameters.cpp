@@ -713,6 +713,13 @@ const AP_Param::Info Copter::var_info[] = {
     GOBJECT(osd, "OSD", AP_OSD),
 #endif
 
+    // @Param: COMM_TIMEOUT
+    // @DisplayName: Communication Timeout
+    // @Description: NUmber of seconds before the craft triggers a communication loss event
+    // @Range: 1 1000
+    // @User: Advanced
+    GSCALAR(comm_timeout_s, "COMM_TIMEOUT", COMM_TIMEOUT_DEFAULT),
+
     // @Group:
     // @Path: Parameters.cpp
     GOBJECT(g2, "",  ParametersG2),
