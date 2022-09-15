@@ -375,7 +375,7 @@ public:
 
         // the k_param_* space is 9-bits in size
         // 400 - HF Parameters
-        k_param_comm_timeout_s = 400,
+        k_param_comm_timeout_ms = 400,
         // 511: reserved
     };
 
@@ -469,7 +469,7 @@ public:
 
 
     // HF Parameters
-    AP_Float                comm_timeout_s;
+    AP_Int32               comm_timeout_ms;
 
     // Note: keep initializers here in the same order as they are declared
     // above.

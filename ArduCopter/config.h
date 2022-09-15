@@ -794,5 +794,5 @@
 #endif
 
 #ifndef COMM_TIMEOUT_DEFAULT
-#define COMM_TIMEOUT_DEFAULT 5.0f
+#define COMM_TIMEOUT_DEFAULT 5000
 #endif

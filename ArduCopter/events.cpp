@@ -121,18 +121,18 @@ void Copter::failsafe_gcs_check()
     const uint32_t last_gcs_update_ms = millis() - failsafe.last_heartbeat_ms;
 
     // Determine which event to trigger
-    if (last_gcs_update_ms < g.comm_timeout_s && failsafe.gcs) {
+    if (last_gcs_update_ms < g.comm_timeout_ms && failsafe.gcs) {
         // Recovery from a GCS failsafe
         set_failsafe_gcs(false);
         failsafe_gcs_off_event();
 
-    } else if (last_gcs_update_ms < g.comm_timeout_s && !failsafe.gcs) {
+    } else if (last_gcs_update_ms < g.comm_timeout_ms && !failsafe.gcs) {
         // No problem, do nothing
 
-    } else if (last_gcs_update_ms > g.comm_timeout_s && failsafe.gcs) {
+    } else if (last_gcs_update_ms > g.comm_timeout_ms && failsafe.gcs) {
         // Already in failsafe, do nothing
 
-    } else if (last_gcs_update_ms > g.comm_timeout_s && !failsafe.gcs) {
+    } else if (last_gcs_update_ms > g.comm_timeout_ms && !failsafe.gcs) {
         // New GCS failsafe event, trigger events
         set_failsafe_gcs(true);
         failsafe_gcs_on_event();
