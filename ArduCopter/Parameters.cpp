@@ -718,7 +718,7 @@ const AP_Param::Info Copter::var_info[] = {
     // @Description: NUmber of seconds before the craft triggers a communication loss event
     // @Range: 1 1000
     // @User: Advanced
-    GSCALAR(comm_timeout_s, "COMM_TIMEOUT", COMM_TIMEOUT_DEFAULT),
+    GSCALAR(comm_timeout_ms, "COMM_TIMEOUT", COMM_TIMEOUT_DEFAULT),
 
     // @Group:
     // @Path: Parameters.cpp
