@@ -16,12 +16,13 @@
  */
 
 /*
- *  NavEKF based AHRS (Attitude Heading Reference System) interface for
+ *  AHRS (Attitude Heading Reference System) frontend interface for
  *  ArduPilot
  *
  */
 
-#include <AP_HAL/AP_HAL.h>
+#include <AP_HAL/AP_HAL_Boards.h>
+#include <AP_HAL/Semaphores.h>
 
 #ifndef HAL_NAVEKF2_AVAILABLE
 // only default to EK2 enabled on boards with over 1M flash
@@ -33,16 +34,12 @@
 #endif
 
 #ifndef AP_AHRS_SIM_ENABLED
-#define AP_AHRS_SIM_ENABLED (CONFIG_HAL_BOARD == HAL_BOARD_SITL)
+#define AP_AHRS_SIM_ENABLED AP_SIM_ENABLED
 #endif
-
-#include "AP_AHRS.h"
 
 #if AP_AHRS_SIM_ENABLED
 #include <SITL/SITL.h>
 #endif
-
-#include <AP_ExternalAHRS/AP_ExternalAHRS.h>
 
 #include <AP_NavEKF2/AP_NavEKF2.h>
 #include <AP_NavEKF3/AP_NavEKF3.h>
@@ -82,6 +79,8 @@ public:
         return _singleton;
     }
 
+    // periodically checks to see if we should update the AHRS
+    // orientation (e.g. based on the AHRS_ORIENTATION parameter)
     // allow for runtime change of orientation
     // this makes initial config easier
     void update_orientation();
@@ -106,10 +105,6 @@ public:
 
     // dead-reckoning support
     bool get_location(struct Location &loc) const;
-    // for scripting until aliases get sorted out:
-    bool get_position(struct Location &loc) const {
-        return get_location(loc);
-    }
 
     // get latest altitude estimate above ground level in meters and validity flag
     bool get_hagl(float &hagl) const WARN_IF_UNUSED;
@@ -160,6 +155,10 @@ public:
     // returns false if estimate is unavailable
     bool airspeed_vector_true(Vector3f &vec) const;
 
+    // return the innovation in m/s, innovation variance in (m/s)^2 and age in msec of the last TAS measurement processed
+    // returns false if the data is unavailable
+    bool airspeed_health_data(float &innovation, float &innovationVariance, uint32_t &age_ms) const;
+
     // return true if airspeed comes from an airspeed sensor, as
     // opposed to an IMU estimate
     bool airspeed_sensor_enabled(void) const;
@@ -198,14 +197,12 @@ public:
     // return ground speed estimate in meters/second. Used by ground vehicles.
     float groundspeed(void);
 
-    const Vector3f &get_accel_ef(uint8_t i) const;
-    const Vector3f &get_accel_ef() const;
+    const Vector3f &get_accel_ef() const {
+        return _accel_ef;
+    }
 
     // Retrieves the corrected NED delta velocity in use by the inertial navigation
     void getCorrectedDeltaVelocityNED(Vector3f& ret, float& dt) const;
-
-    // blended accelerometer values in the earth frame in m/s/s
-    const Vector3f &get_accel_ef_blended() const;
 
     // set the EKF's origin location in 10e7 degrees.  This should only
     // be called when the EKF has no absolute position reference (i.e. GPS)
@@ -282,9 +279,6 @@ public:
     // true if offsets are valid
     bool getMagOffsets(uint8_t mag_idx, Vector3f &magOffsets) const;
 
-    // check all cores providing consistent attitudes for prearm checks
-    bool attitudes_consistent(char *failure_msg, const uint8_t failure_msg_len) const;
-
     // return the amount of yaw angle change due to the last yaw angle reset in radians
     // returns the time of the last yaw angle reset or 0 if no reset has ever occurred
     uint32_t getLastYawResetAngle(float &yawAng);
@@ -309,7 +303,7 @@ public:
     bool resetHeightDatum();
 
     // send a EKF_STATUS_REPORT for current EKF
-    void send_ekf_status_report(mavlink_channel_t chan) const;
+    void send_ekf_status_report(class GCS_MAVLINK &link) const;
 
     // get_hgt_ctrl_limit - get maximum height to be observed by the control loops in meters and a validity flag
     // this is used to limit height during optical flow navigation
@@ -368,6 +362,9 @@ public:
     // set position, velocity and yaw sources to either 0=primary, 1=secondary, 2=tertiary
     void set_posvelyaw_source_set(uint8_t source_set_idx);
 
+    //returns index of active source set used, 0=primary, 1=secondary, 2=tertiary
+    uint8_t get_posvelyaw_source_set() const;
+
     void Log_Write();
 
     // check if non-compass sensor is providing yaw.  Allows compass pre-arm checks to be bypassed
@@ -378,11 +375,6 @@ public:
 
     // set and save the ALT_M_NSE parameter value
     void set_alt_measurement_noise(float noise);
-
-    // active EKF type for logging
-    uint8_t get_active_AHRS_type(void) const {
-        return uint8_t(active_EKF_type());
-    }
 
     // get the selected ekf type, for allocation decisions
     int8_t get_ekf_type(void) const {
@@ -540,7 +532,7 @@ public:
 
     // convert a vector from body to earth frame
     Vector3f body_to_earth(const Vector3f &v) const {
-        return v * get_rotation_body_to_ned();
+        return get_rotation_body_to_ned() * v;
     }
 
     // convert a vector from earth to body frame
@@ -613,8 +605,8 @@ public:
         _vehicle_class = vclass;
     }
 
-    // get the view's rotation, or ROTATION_NONE
-    enum Rotation get_view_rotation(void) const;
+    // get the view
+    AP_AHRS_View *get_view(void) const { return _view; };
 
     // get access to an EKFGSF_yaw estimator
     const EKFGSF_yaw *get_yaw_estimator(void) const;
@@ -641,14 +633,6 @@ private:
     AP_Int8 _wind_max;
     AP_Int8 _board_orientation;
     AP_Int8 _ekf_type;
-    AP_Float _custom_roll;
-    AP_Float _custom_pitch;
-    AP_Float _custom_yaw;
-
-    /*
-     * support for custom AHRS orientation, replacing _board_orientation
-     */
-    Matrix3f _custom_rotation;
 
     /*
      * DCM-backend parameters; it takes references to these
@@ -688,6 +672,9 @@ private:
         return _ekf_flags & FLAG_ALWAYS_USE_EKF;
     }
 
+    // check all cores providing consistent attitudes for prearm checks
+    bool attitudes_consistent(char *failure_msg, const uint8_t failure_msg_len) const;
+
     /*
      * Attitude-related private methods and attributes:
      */
@@ -725,8 +712,7 @@ private:
 
     Vector3f _gyro_drift;
     Vector3f _gyro_estimate;
-    Vector3f _accel_ef_ekf[INS_MAX_INSTANCES];
-    Vector3f _accel_ef_ekf_blended;
+    Vector3f _accel_ef;
     Vector3f _accel_bias;
 
     const uint16_t startup_delay_ms = 1000;
@@ -788,6 +774,9 @@ private:
 
     Matrix3f _rotation_autopilot_body_to_vehicle_body;
     Matrix3f _rotation_vehicle_body_to_autopilot_body;
+
+    // last time orientation was updated from AHRS_ORIENTATION:
+    uint32_t last_orientation_update_ms;
 
     // updates matrices responsible for rotating vectors from vehicle body
     // frame to autopilot body frame from _trim variables

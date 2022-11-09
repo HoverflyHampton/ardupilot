@@ -109,7 +109,6 @@ FlightAxis::FlightAxis(const char *frame_str) :
     Aircraft(frame_str)
 {
     use_time_sync = false;
-    num_motors = 2;
     rate_hz = 250 / target_speedup;
     heli_demix = strstr(frame_str, "helidemix") != nullptr;
     rev4_servos = strstr(frame_str, "rev4") != nullptr;
@@ -494,7 +493,7 @@ void FlightAxis::update(const struct sitl_input &input)
     Vector3f airspeed3d = dcm.mul_transpose(airspeed_3d_ef);
 
     if (last_imu_rotation != ROTATION_NONE) {
-        airspeed3d = airspeed3d * sitl->ahrs_rotation_inv;
+        airspeed3d = sitl->ahrs_rotation * airspeed3d;
     }
     airspeed_pitot = MAX(airspeed3d.x,0);
 

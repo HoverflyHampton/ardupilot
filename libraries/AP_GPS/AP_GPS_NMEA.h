@@ -46,10 +46,6 @@
 #include "AP_GPS.h"
 #include "GPS_Backend.h"
 
-#ifndef AP_GPS_NMEA_ENABLED
-  #define AP_GPS_NMEA_ENABLED AP_GPS_BACKEND_DEFAULT_ENABLED
-#endif
-
 #if AP_GPS_NMEA_ENABLED
 /// NMEA parser
 ///
@@ -192,7 +188,7 @@ private:
       example: $KSXT,20211016083433.00,116.31296102,39.95817066,49.4911,223.57,-11.32,330.19,0.024,,1,3,28,27,,,,-0.012,0.021,0.020,,*2D
      */
     struct {
-        float fields[21];
+        double fields[21];
     } _ksxt;
 
 };

@@ -15,10 +15,11 @@
 #pragma once
 
 #include <AP_Common/AP_Common.h>
+#include <AP_Common/Location.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_Math/AP_Math.h>
-#include <GCS_MAVLink/GCS.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>
 #include <AC_PID/AC_P.h>
 #include <AP_RTC/JitterCorrection.h>
 
@@ -47,7 +48,7 @@ public:
     bool enabled() const { return _enabled; }
 
     // set which target to follow
-    void set_target_sysid(uint8_t sysid) { _sysid = sysid; }
+    void set_target_sysid(uint8_t sysid) { _sysid.set(sysid); }
 
     // restore offsets to zero if necessary, should be called when vehicle exits follow mode
     void clear_offsets_if_required();

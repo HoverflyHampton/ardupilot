@@ -582,12 +582,14 @@ uint32_t AP_Frsky_SPort_Passthrough::calc_ap_status(void)
     ap_status |= (uint8_t)(AP_Notify::flags.ekf_bad)<<AP_EKF_FS_OFFSET;
     // generic failsafe
     ap_status |= (uint8_t)(AP_Notify::flags.failsafe_battery||AP_Notify::flags.failsafe_ekf||AP_Notify::flags.failsafe_gcs||AP_Notify::flags.failsafe_radio)<<AP_FS_OFFSET;
+#if AP_FENCE_ENABLED
     // fence status
     AC_Fence *fence = AP::fence();
     if (fence != nullptr) {
         ap_status |= (uint8_t)(fence->enabled() && fence->present()) << AP_FENCE_PRESENT_OFFSET;
         ap_status |= (uint8_t)(fence->get_breaches()>0) << AP_FENCE_BREACH_OFFSET;
     }
+#endif
     // signed throttle [-100,100] scaled down to [-63,63] on 7 bits, MSB for sign + 6 bits for 0-63
     ap_status |= prep_number(gcs().get_hud_throttle()*0.63, 2, 0)<<AP_THROTTLE_OFFSET;
     // IMU temperature
@@ -857,10 +859,10 @@ bool AP_Frsky_SPort_Passthrough::set_telem_data(const uint8_t frame, const uint1
     // queue only Uplink packets
     if (frame == SPORT_UPLINK_FRAME || frame == SPORT_UPLINK_FRAME_RW) {
         const AP_Frsky_SPort::sport_packet_t sp {
-            0x00,   // this is ignored by process_sport_rx_queue() so no need for a real sensor ID
+            { 0x00,   // this is ignored by process_sport_rx_queue() so no need for a real sensor ID
             frame,
             appid,
-            data
+            data }
         };
 
         _SPort_bidir.rx_packet_queue.push_force(sp);

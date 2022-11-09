@@ -14,6 +14,9 @@ APJ_BOARD_ID 140
 
 FLASH_SIZE_KB 2048
 
+# supports upto 8MBits/s
+CANFD_SUPPORTED 8
+
 # with 2M flash we can afford to optimize for speed
 env OPTIMIZE -O2
 
@@ -329,3 +332,11 @@ DMA_NOSHARE SPI1* SPI4* USART6*
 # for users who have replaced their CubeSolo with a CubeOrange:
 define HAL_OREO_LED_ENABLED 1
 define HAL_SOLO_GIMBAL_ENABLED HAL_MOUNT_ENABLED
+
+# Enable Sagetech MXS ADSB transponder
+define HAL_ADSB_SAGETECH_MXS_ENABLED HAL_ADSB_ENABLED
+
+# enable DFU reboot for installing bootloader
+# note that if firmware is build with --secure-bl then DFU is
+# disabled
+ENABLE_DFU_BOOT 1

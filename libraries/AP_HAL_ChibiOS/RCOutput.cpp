@@ -32,6 +32,10 @@
 #include <GCS_MAVLink/GCS.h>
 #endif
 
+#if AP_SIM_ENABLED
+#include <AP_HAL/SIMState.h>
+#endif
+
 #if HAL_USE_PWM == TRUE
 #include <SRV_Channel/SRV_Channel.h>
 
@@ -220,7 +224,7 @@ __RAMFUNC__ void RCOutput::dshot_update_tick(void* p)
     chSysUnlockFromISR();
 }
 
-#ifndef HAL_NO_SHARED_DMA
+#if AP_HAL_SHARED_DMA_ENABLED
 // release locks on the groups that are pending in reverse order
 void RCOutput::dshot_collect_dma_locks(uint32_t time_out_us)
 {
@@ -275,7 +279,7 @@ void RCOutput::dshot_collect_dma_locks(uint32_t time_out_us)
         }
     }
 }
-#endif // HAL_NO_SHARED_DMA
+#endif // AP_HAL_SHARED_DMA_ENABLED
 
 /*
   setup the output frequency for a group and start pwm output
@@ -516,10 +520,10 @@ RCOutput::pwm_group *RCOutput::find_chan(uint8_t chan, uint8_t &group_idx)
 /*
  * return mask of channels that must be disabled because they share a group with a digital channel
  */
-uint16_t RCOutput::get_disabled_channels(uint16_t digital_mask)
+uint32_t RCOutput::get_disabled_channels(uint32_t digital_mask)
 {
-    uint16_t dmask = (digital_mask >> chan_offset);
-    uint16_t disabled_chan_mask = 0;
+    uint32_t dmask = (digital_mask >> chan_offset);
+    uint32_t disabled_chan_mask = 0;
     for (auto &group : pwm_group_list) {
         bool digital_group = false;
         for (uint8_t j = 0; j < 4; j++) {
@@ -579,10 +583,18 @@ void RCOutput::disable_ch(uint8_t chan)
 
 void RCOutput::write(uint8_t chan, uint16_t period_us)
 {
+
     if (chan >= max_channels) {
         return;
     }
     last_sent[chan] = period_us;
+
+#if AP_SIM_ENABLED
+    hal.simstate->pwm_output[chan] = period_us;
+    if (!(AP::sitl()->on_hardware_output_enable_mask & (1U<<chan))) {
+        return;
+    }
+#endif
 
 #if HAL_WITH_IO_MCU
     // handle IO MCU channels
@@ -625,7 +637,7 @@ void RCOutput::push_local(void)
     if (active_fmu_channels == 0) {
         return;
     }
-    uint16_t outmask = (1U<<active_fmu_channels)-1;
+    uint32_t outmask = (1U<<active_fmu_channels)-1;
     outmask &= en_mask;
 
     uint16_t widest_pulse = 0;
@@ -1009,7 +1021,7 @@ void RCOutput::set_group_mode(pwm_group &group)
 /*
   setup output mode
  */
-void RCOutput::set_output_mode(uint16_t mask, const enum output_mode mode)
+void RCOutput::set_output_mode(uint32_t mask, const enum output_mode mode)
 {
     for (auto &group : pwm_group_list) {
         enum output_mode thismode = mode;
@@ -1393,7 +1405,7 @@ void RCOutput::dshot_send(pwm_group &group, uint32_t time_out_us)
     // assume that we won't be able to get the input capture lock
     group.bdshot.enabled = false;
 
-    uint16_t active_channels = group.ch_mask & group.en_mask;
+    uint32_t active_channels = group.ch_mask & group.en_mask;
     // now grab the input capture lock if we are able, we can only enable bi-dir on a group basis
     if (((_bdshot.mask & active_channels) == active_channels) && group.has_ic()) {
         if (group.has_shared_ic_up_dma()) {
@@ -1466,7 +1478,7 @@ void RCOutput::dshot_send(pwm_group &group, uint32_t time_out_us)
                 continue;
             }
 
-            const uint16_t chan_mask = (1U<<chan);
+            const uint32_t chan_mask = (1U<<chan);
 
             pwm = constrain_int16(pwm, 1000, 2000);
             uint16_t value = MIN(2 * (pwm - 1000), 1999);
@@ -1670,7 +1682,7 @@ void RCOutput::dma_cancel(pwm_group& group)
   While serial output is active normal output to the channel group is
   suspended.
 */
-bool RCOutput::serial_setup_output(uint8_t chan, uint32_t baudrate, uint16_t chanmask)
+bool RCOutput::serial_setup_output(uint8_t chan, uint32_t baudrate, uint32_t chanmask)
 {
     // account for IOMCU channels
     chan -= chan_offset;
@@ -2022,11 +2034,9 @@ bool RCOutput::force_safety_on(void)
     if (AP_BoardConfig::io_enabled()) {
         return iomcu.force_safety_on();
     }
-    return false;
-#else
+#endif
     safety_state = AP_HAL::Util::SAFETY_DISARMED;
     return true;
-#endif
 }
 
 /*
@@ -2037,10 +2047,10 @@ void RCOutput::force_safety_off(void)
 #if HAL_WITH_IO_MCU
     if (AP_BoardConfig::io_enabled()) {
         iomcu.force_safety_off();
+        return;
     }
-#else
-    safety_state = AP_HAL::Util::SAFETY_ARMED;
 #endif
+    safety_state = AP_HAL::Util::SAFETY_ARMED;
 }
 
 /*
@@ -2132,7 +2142,7 @@ uint32_t RCOutput::protocol_bitrate(const enum output_mode mode)
   setup serial led output for a given channel number, with
   the given max number of LEDs in the chain.
 */
-bool RCOutput::set_serial_led_num_LEDs(const uint16_t chan, uint8_t num_leds, output_mode mode, uint16_t clock_mask)
+bool RCOutput::set_serial_led_num_LEDs(const uint16_t chan, uint8_t num_leds, output_mode mode, uint32_t clock_mask)
 {
     if (!_initialised || num_leds == 0) {
         return false;

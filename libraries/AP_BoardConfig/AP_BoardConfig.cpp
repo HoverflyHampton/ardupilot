@@ -176,7 +176,7 @@ const AP_Param::GroupInfo AP_BoardConfig::var_info[] = {
     // @Param: SERIAL_NUM
     // @DisplayName: User-defined serial number
     // @Description: User-defined serial number of this vehicle, it can be any arbitrary number you want and has no effect on the autopilot
-    // @Range: -32768 32767
+    // @Range: -8388608 8388607
     // @User: Standard
     AP_GROUPINFO("SERIAL_NUM", 5, AP_BoardConfig, vehicleSerialNumber, 0),
 
@@ -342,6 +342,9 @@ const AP_Param::GroupInfo AP_BoardConfig::var_info[] = {
 
 void AP_BoardConfig::init()
 {
+    // PARAMETER_CONVERSION - Added: APR-2022
+    vehicleSerialNumber.convert_parameter_width(AP_PARAM_INT16);
+
     board_setup();
 
     AP::rtc().set_utc_usec(hal.util->get_hw_rtc(), AP_RTC::SOURCE_HW);
@@ -375,7 +378,7 @@ void AP_BoardConfig::init()
 }
 
 // set default value for BRD_SAFETY_MASK
-void AP_BoardConfig::set_default_safety_ignore_mask(uint16_t mask)
+void AP_BoardConfig::set_default_safety_ignore_mask(uint32_t mask)
 {
     state.ignore_safety_channels.set_default(mask);
 }
@@ -413,7 +416,7 @@ void AP_BoardConfig::throw_error(const char *err_type, const char *fmt, va_list 
                 vprintf(printfmt, arg_copy);
                 va_end(arg_copy);
             }
-#if !APM_BUILD_TYPE(APM_BUILD_UNKNOWN) && !defined(HAL_BUILD_AP_PERIPH)
+#if HAL_GCS_ENABLED
             hal.util->snprintf(printfmt, sizeof(printfmt), "%s: %s", err_type, fmt);
             {
                 va_list arg_copy;
@@ -423,7 +426,7 @@ void AP_BoardConfig::throw_error(const char *err_type, const char *fmt, va_list 
             }
 #endif
         }
-#if !APM_BUILD_TYPE(APM_BUILD_UNKNOWN) && !defined(HAL_BUILD_AP_PERIPH)
+#if HAL_GCS_ENABLED
         gcs().update_receive();
         gcs().update_send();
 #endif

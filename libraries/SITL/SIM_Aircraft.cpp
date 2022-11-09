@@ -16,12 +16,13 @@
   parent class for aircraft simulators
 */
 
+#define ALLOW_DOUBLE_MATH_FUNCTIONS
+
 #include "SIM_Aircraft.h"
 
 #include <stdio.h>
 #include <sys/time.h>
 #include <unistd.h>
-
 
 #if defined(__CYGWIN__) || defined(__CYGWIN64__)
 #include <windows.h>
@@ -38,6 +39,8 @@
 #include <AP_BoardConfig/AP_BoardConfig.h>
 
 using namespace SITL;
+
+extern const AP_HAL::HAL& hal;
 
 /*
   parent class for all simulator types
@@ -280,7 +283,13 @@ void Aircraft::sync_frame_time(void)
     }
     if (sleep_debt_us > min_sleep_time) {
         // sleep if we have built up a debt of min_sleep_tim
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
         usleep(sleep_debt_us);
+#elif CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
+        hal.scheduler->delay_microseconds(sleep_debt_us);
+#else
+        // ??
+#endif
         sleep_debt_us -= (get_wall_time_us() - now);
     }
     last_wall_time_us = get_wall_time_us();
@@ -381,9 +390,8 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
     fdm.velocity_air_bf = velocity_air_bf;
     fdm.battery_voltage = battery_voltage;
     fdm.battery_current = battery_current;
-    fdm.num_motors = num_motors;
-    fdm.vtol_motor_start = vtol_motor_start;
-    memcpy(fdm.rpm, rpm, num_motors * sizeof(float));
+    fdm.motor_mask = motor_mask | sitl->vibe_motor_mask;
+    memcpy(fdm.rpm, rpm, sizeof(fdm.rpm));
     fdm.rcin_chan_count = rcin_chan_count;
     fdm.range = rangefinder_range();
     memcpy(fdm.rcin, rcin, rcin_chan_count * sizeof(float));
@@ -420,26 +428,9 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
     if (ahrs_orientation != nullptr) {
         enum Rotation imu_rotation = (enum Rotation)ahrs_orientation->get();
         if (imu_rotation != last_imu_rotation) {
-            // Surprisingly, Matrix3<T>::from_rotation(ROTATION_CUSTOM) is the identity matrix
-            // so we must deal with that here
-            if (imu_rotation == ROTATION_CUSTOM) {
-                if ((custom_roll == nullptr) || (custom_pitch == nullptr) || (custom_yaw == nullptr)) {
-                    enum ap_var_type ptype;
-                    custom_roll = (AP_Float *)AP_Param::find("AHRS_CUSTOM_ROLL", &ptype);
-                    custom_pitch = (AP_Float *)AP_Param::find("AHRS_CUSTOM_PIT", &ptype);
-                    custom_yaw = (AP_Float *)AP_Param::find("AHRS_CUSTOM_YAW", &ptype);
-                }
-                if ((custom_roll != nullptr) && (custom_pitch != nullptr) && (custom_yaw != nullptr)) {
-                    sitl->ahrs_rotation.from_euler(radians(*custom_roll), radians(*custom_pitch), radians(*custom_yaw));
-                    sitl->ahrs_rotation_inv = sitl->ahrs_rotation.transposed();
-                } else {
-                    AP_HAL::panic("could not find one or more of parameters AHRS_CUSTOM_ROLL/PITCH/YAW");
-                }
-            } else {
-                sitl->ahrs_rotation.from_rotation(imu_rotation);
-                sitl->ahrs_rotation_inv = sitl->ahrs_rotation.transposed();
-                last_imu_rotation = imu_rotation;
-            }
+            sitl->ahrs_rotation.from_rotation(imu_rotation);
+            sitl->ahrs_rotation_inv = sitl->ahrs_rotation.transposed();
+            last_imu_rotation = imu_rotation;
         }
         if (imu_rotation != ROTATION_NONE) {
             Matrix3f m = dcm;
@@ -455,7 +446,7 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
 
     // in the first call here, if a speedup option is specified, overwrite it
     if (is_equal(last_speedup, -1.0f) && !is_equal(get_speedup(), 1.0f)) {
-        sitl->speedup = get_speedup();
+        sitl->speedup.set(get_speedup());
     }
     
     if (!is_equal(last_speedup, float(sitl->speedup)) && sitl->speedup > 0) {
@@ -493,11 +484,19 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
 // is bouncing off:
 float Aircraft::perpendicular_distance_to_rangefinder_surface() const
 {
-    return sitl->height_agl;
+    switch ((Rotation)sitl->sonar_rot.get()) {
+    case Rotation::ROTATION_PITCH_270:
+        return sitl->height_agl;
+    case ROTATION_NONE ... ROTATION_YAW_315:
+        return sitl->measure_distance_at_angle_bf(location, sitl->sonar_rot.get()*45);
+    default:
+        AP_BoardConfig::config_error("Bad simulated sonar rotation");
+    }
 }
 
 float Aircraft::rangefinder_range() const
 {
+
     float roll = sitl->state.rollDeg;
     float pitch = sitl->state.pitchDeg;
 
@@ -534,6 +533,7 @@ float Aircraft::rangefinder_range() const
     // sensor position offset in body frame
     const Vector3f relPosSensorBF = sitl->rngfnd_pos_offset;
 
+    // n.b. the following code is assuming rotation-pitch-270:
     // adjust altitude for position of the sensor on the vehicle if position offset is non-zero
     if (!relPosSensorBF.is_zero()) {
         // get a rotation matrix following DCM conventions (body to earth)
@@ -555,6 +555,7 @@ float Aircraft::rangefinder_range() const
 }
 
 
+// potentially replace this with a call to AP_HAL::Util::get_hw_rtc
 uint64_t Aircraft::get_wall_time_us() const
 {
 #if defined(__CYGWIN__) || defined(__CYGWIN64__)
@@ -568,10 +569,12 @@ uint64_t Aircraft::get_wall_time_us() const
     last_ret_us += (uint64_t)((now - tPrev)*1000UL);
     tPrev = now;
     return last_ret_us;
-#else
+#elif CONFIG_HAL_BOARD == HAL_BOARD_SITL
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return uint64_t(ts.tv_sec * 1000000ULL + ts.tv_nsec / 1000ULL);
+#else
+    return AP_HAL::micros64();
 #endif
 }
 
@@ -948,6 +951,13 @@ void Aircraft::update_external_payload(const struct sitl_input &input)
         external_payload_mass += sprayer->payload_mass();
     }
 
+    {
+        const float range = rangefinder_range();
+        for (uint8_t i=0; i<RANGEFINDER_MAX_INSTANCES; i++) {
+            rangefinder_m[i] = range;
+        }
+    }
+
     // update i2c
     if (i2c) {
         i2c->update(*this);
@@ -978,7 +988,7 @@ void Aircraft::update_external_payload(const struct sitl_input &input)
     if (precland && precland->is_enabled()) {
         precland->update(get_location(), get_position_relhome());
         if (precland->_over_precland_base) {
-            local_ground_level += precland->_origin_height;
+            local_ground_level += precland->_device_height;
         }
     }
 
@@ -1020,7 +1030,7 @@ void Aircraft::add_shove_forces(Vector3f &rot_accel, Vector3f &body_accel)
         body_accel.z += sitl->shove.z;
     } else {
         sitl->shove.start_ms = 0;
-        sitl->shove.t = 0;
+        sitl->shove.t.set(0);
     }
 }
 
@@ -1109,7 +1119,7 @@ void Aircraft::add_twist_forces(Vector3f &rot_accel)
         rot_accel.z += sitl->twist.z;
     } else {
         sitl->twist.start_ms = 0;
-        sitl->twist.t = 0;
+        sitl->twist.t.set(0);
     }
 }
 

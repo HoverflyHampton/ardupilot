@@ -617,8 +617,8 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: LOG_BITMASK
     // @DisplayName: Log bitmask
-    // @Description: Bitmap of what on-board log types to enable. This value is made up of the sum of each of the log types you want to be saved. It is usually best just to enable all log types by setting this to 65535. The individual bits are ATTITUDE_FAST=1, ATTITUDE_MEDIUM=2, GPS=4, PerformanceMonitoring=8, ControlTuning=16, NavigationTuning=32, Mode=64, IMU=128, Commands=256, Battery=512, Compass=1024, TECS=2048, Camera=4096, RCandServo=8192, Sonar=16384, Arming=32768, FullLogs=65535
-    // @Bitmask: 0:ATTITUDE_FAST,1:ATTITUDE_MED,2:GPS,3:PM,4:CTUN,5:NTUN,6:MODE,7:IMU,8:CMD,9:CURRENT,10:COMPASS,11:TECS,12:CAMERA,13:RC,14:SONAR,15:ARM/DISARM,19:IMU_RAW,20:ATTITUDE_FULLRATE,21:VideoStabilization
+    // @Description: Bitmap of what on-board log types to enable. This value is made up of the sum of each of the log types you want to be saved. It is usually best just to enable all basic log types by setting this to 65535.
+    // @Bitmask: 0:Fast Attitude,1:Medium Attitude,2:GPS,3:Performance,4:Control Tuning,5:Navigation Tuning,7:IMU,8:Mission Commands,9:Battery Monitor,10:Compass,11:TECS,12:Camera,13:RC Input-Output,14:Rangefinder,19:Raw IMU,20:Fullrate Attitude,21:Video Stabilization
     // @User: Advanced
     GSCALAR(log_bitmask,            "LOG_BITMASK",    DEFAULT_LOG_BITMASK),
 
@@ -924,7 +924,7 @@ const AP_Param::Info Plane::var_info[] = {
     GOBJECT(can_mgr,        "CAN_",       AP_CANManager),
 #endif
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#if AP_SIM_ENABLED
     // @Group: SIM_
     // @Path: ../libraries/SITL/SITL.cpp
     GOBJECT(sitl, "SIM_", SITL::SIM),
@@ -939,7 +939,7 @@ const AP_Param::Info Plane::var_info[] = {
 #if AP_OPTICALFLOW_ENABLED
     // @Group: FLOW
     // @Path: ../libraries/AP_OpticalFlow/AP_OpticalFlow.cpp
-    GOBJECT(optflow,   "FLOW", OpticalFlow),
+    GOBJECT(optflow,   "FLOW", AP_OpticalFlow),
 #endif
 
     // @Group: MIS_
@@ -949,12 +949,6 @@ const AP_Param::Info Plane::var_info[] = {
     // @Group: RALLY_
     // @Path: ../libraries/AP_Rally/AP_Rally.cpp
     GOBJECT(rally,  "RALLY_",       AP_Rally),
-
-#if AC_FENCE == ENABLED
-    // @Group: FENCE_
-    // @Path: ../libraries/AC_Fence/AC_Fence.cpp
-    GOBJECT(fence, "FENCE_",        AC_Fence),
-#endif
 
 #if HAL_NAVEKF2_AVAILABLE
     // @Group: EK2_
@@ -1016,9 +1010,11 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_SUBGROUPPTR(button_ptr, "BTN_", 1, ParametersG2, AP_Button),
 #endif
 
+#if AP_ICENGINE_ENABLED
     // @Group: ICE_
     // @Path: ../libraries/AP_ICEngine/AP_ICEngine.cpp
     AP_SUBGROUPINFO(ice_control, "ICE_", 2, ParametersG2, AP_ICEngine),
+#endif
 
     // 3 was used by prototype for servo_channels
     
@@ -1082,7 +1078,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Param: FLIGHT_OPTIONS
     // @DisplayName: Flight mode options
     // @Description: Flight mode specific options
-    // @Bitmask: 0:Rudder mixing in direct flight modes only (Manual / Stabilize / Acro),1:Use centered throttle in Cruise or FBWB to indicate trim airspeed, 2:Disable attitude check for takeoff arming, 3:Force target airspeed to trim airspeed in Cruise or FBWB, 4: Climb to ALT_HOLD_RTL before turning for RTL, 5: Enable yaw damper in acro mode, 6: Surpress speed scaling during auto takeoffs to be 1 or less to prevent oscillations without airpseed sensor., 7:EnableDefaultAirspeed for takeoff, 8: Remove the TRIM_PITCH_CD on the GCS horizon, 9: Remove the TRIM_PITCH_CD on the OSD horizon, 10: Adjust mid-throttle to be TRIM_THROTTLE in non-auto throttle modes except MANUAL, 11:Disable suppression of fixed wing rate gains in ground mode
+    // @Bitmask: 0:Rudder mixing in direct flight modes only (Manual / Stabilize / Acro),1:Use centered throttle in Cruise or FBWB to indicate trim airspeed, 2:Disable attitude check for takeoff arming, 3:Force target airspeed to trim airspeed in Cruise or FBWB, 4: Climb to ALT_HOLD_RTL before turning for RTL, 5: Enable yaw damper in acro mode, 6: Surpress speed scaling during auto takeoffs to be 1 or less to prevent oscillations without airpseed sensor., 7:EnableDefaultAirspeed for takeoff, 8: Remove the TRIM_PITCH_CD on the GCS horizon, 9: Remove the TRIM_PITCH_CD on the OSD horizon, 10: Adjust mid-throttle to be TRIM_THROTTLE in non-auto throttle modes except MANUAL, 11:Disable suppression of fixed wing rate gains in ground mode, 12: Enable FBWB style loiter altitude control
     // @User: Advanced
     AP_GROUPINFO("FLIGHT_OPTIONS", 13, ParametersG2, flight_options, 0),
 
@@ -1240,7 +1236,10 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
 };
 
 ParametersG2::ParametersG2(void) :
-    ice_control(plane.rpm_sensor)
+    unused_integer{1}
+#if AP_ICENGINE_ENABLED
+    ,ice_control(plane.rpm_sensor)
+#endif
 #if HAL_SOARING_ENABLED
     ,soaring_controller(plane.TECS_controller, plane.aparm)
 #endif
@@ -1350,6 +1349,7 @@ void Plane::load_parameters(void)
         g.format_version.set_and_save(Parameters::k_format_version);
         hal.console->printf("done.\n");
     }
+    g.format_version.set_default(Parameters::k_format_version);
 
     uint32_t before = micros();
     // Load all auto-loaded EEPROM variables
@@ -1385,6 +1385,7 @@ void Plane::load_parameters(void)
         }
     }
 
+#if AP_FENCE_ENABLED
     enum ap_var_type ptype_fence_type;
     AP_Int8 *fence_type_new = (AP_Int8*)AP_Param::find("FENCE_TYPE", &ptype_fence_type);
     if (fence_type_new && !fence_type_new->configured()) {
@@ -1469,6 +1470,7 @@ void Plane::load_parameters(void)
             }
         }
     }
+#endif // AP_FENCE_ENABLED
 
 #if AP_TERRAIN_AVAILABLE
     g.terrain_follow.convert_parameter_width(AP_PARAM_INT8);
@@ -1492,6 +1494,7 @@ void Plane::load_parameters(void)
     }
 #endif
 
+#if AP_AIRSPEED_ENABLED
     // PARAMETER_CONVERSION - Added: Jan-2022
     {
         const uint16_t old_key = g.k_param_airspeed;
@@ -1499,6 +1502,30 @@ void Plane::load_parameters(void)
         const uint16_t old_top_element = 0; // Old group element in the tree for the first subgroup element (see AP_PARAM_KEY_DUMP)
         AP_Param::convert_class(old_key, &airspeed, airspeed.var_info, old_index, old_top_element, true);
     }
+#endif
+
+#if HAL_INS_NUM_HARMONIC_NOTCH_FILTERS > 1
+    if (!ins.harmonic_notches[1].params.enabled()) {
+        // notch filter parameter conversions (moved to INS_HNTC2) for 4.2.x, converted from fixed notch
+        const AP_Param::ConversionInfo notchfilt_conversion_info[] {
+            { Parameters::k_param_ins, 101, AP_PARAM_INT8,  "INS_HNTC2_ENABLE" },
+            { Parameters::k_param_ins, 293, AP_PARAM_FLOAT, "INS_HNTC2_ATT" },
+            { Parameters::k_param_ins, 357, AP_PARAM_FLOAT, "INS_HNTC2_FREQ" },
+            { Parameters::k_param_ins, 421, AP_PARAM_FLOAT, "INS_HNTC2_BW" },
+        };
+        uint8_t notchfilt_table_size = ARRAY_SIZE(notchfilt_conversion_info);
+        for (uint8_t i=0; i<notchfilt_table_size; i++) {
+            AP_Param::convert_old_parameters(&notchfilt_conversion_info[i], 1.0f);
+        }
+        AP_Param::set_default_by_name("INS_HNTC2_MODE", 0);
+        AP_Param::set_default_by_name("INS_HNTC2_HMNCS", 1);
+    }
+#endif // HAL_INS_NUM_HARMONIC_NOTCH_FILTERS
+    
+    // PARAMETER_CONVERSION - Added: Mar-2022
+#if AP_FENCE_ENABLED
+    AP_Param::convert_class(g.k_param_fence, &fence, fence.var_info, 0, 0, true);
+#endif
 
 #if HAL_INS_NUM_HARMONIC_NOTCH_FILTERS > 1
     if (!ins.harmonic_notches[1].params.enabled()) {

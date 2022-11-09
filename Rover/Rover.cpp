@@ -82,7 +82,6 @@ const AP_Scheduler::Task Rover::scheduler_tasks[] = {
     SCHED_TASK_CLASS(AP_Proximity,        &rover.g2.proximity,     update,         50,  200,  27),
 #endif
     SCHED_TASK_CLASS(AP_WindVane,         &rover.g2.windvane,      update,         20,  100,  30),
-    SCHED_TASK_CLASS(AC_Fence,            &rover.g2.fence,         update,         10,  100,  33),
     SCHED_TASK(update_wheel_encoder,   50,    200,  36),
     SCHED_TASK(update_compass,         10,    200,  39),
     SCHED_TASK(update_logging1,        10,    200,  45),
@@ -95,6 +94,9 @@ const AP_Scheduler::Task Rover::scheduler_tasks[] = {
     SCHED_TASK_CLASS(AP_ServoRelayEvents, &rover.ServoRelayEvents, update_events,  50,  200,  66),
 #if GRIPPER_ENABLED == ENABLED
     SCHED_TASK_CLASS(AP_Gripper,          &rover.g2.gripper,       update,         10,   75,  69),
+#if PRECISION_LANDING == ENABLED
+    SCHED_TASK(update_precland,      400,     50,  70),
+#endif
 #endif
     SCHED_TASK_CLASS(AP_RPM,              &rover.rpm_sensor,       update,         10,  100,  72),
 #if HAL_MOUNT_ENABLED
@@ -112,7 +114,6 @@ const AP_Scheduler::Task Rover::scheduler_tasks[] = {
 #if HAL_SPRAYER_ENABLED
     SCHED_TASK_CLASS(AC_Sprayer,          &rover.g2.sprayer,       update,          3,  90,  99),
 #endif
-    SCHED_TASK_CLASS(Compass,             &rover.compass,          cal_update,     50, 200, 102),
     SCHED_TASK(compass_save,            0.1,  200, 105),
 #if LOGGING_ENABLED == ENABLED
     SCHED_TASK_CLASS(AP_Logger,           &rover.logger,           periodic_tasks, 50,  300, 108),
@@ -129,9 +130,6 @@ const AP_Scheduler::Task Rover::scheduler_tasks[] = {
     SCHED_TASK(cruise_learn_update,    50,    200, 126),
 #if ADVANCED_FAILSAFE == ENABLED
     SCHED_TASK(afs_fs_check,           10,    200, 129),
-#endif
-#if HAL_AIS_ENABLED
-    SCHED_TASK_CLASS(AP_AIS, &rover.g2.ais, update, 5, 100, 135),
 #endif
 };
 
@@ -372,16 +370,21 @@ void Rover::update_logging1(void)
 
     if (should_log(MASK_LOG_THR)) {
         Log_Write_Throttle();
-        logger.Write_Beacon(g2.beacon);
+        g2.beacon.log();
     }
 
     if (should_log(MASK_LOG_NTUN)) {
         Log_Write_Nav_Tuning();
+        if (g2.pos_control.is_active()) {
+            g2.pos_control.write_log();
+            logger.Write_PID(LOG_PIDN_MSG, g2.pos_control.get_vel_pid().get_pid_info_x());
+            logger.Write_PID(LOG_PIDE_MSG, g2.pos_control.get_vel_pid().get_pid_info_y());
+        }
     }
 
 #if HAL_PROXIMITY_ENABLED
     if (should_log(MASK_LOG_RANGEFINDER)) {
-        logger.Write_Proximity(g2.proximity);
+        g2.proximity.log();
     }
 #endif
 }
@@ -411,9 +414,6 @@ void Rover::update_logging2(void)
  */
 void Rover::one_second_loop(void)
 {
-    // allow orientation change at runtime to aid config
-    ahrs.update_orientation();
-
     set_control_channels();
 
     // cope with changes to aux functions
@@ -439,6 +439,7 @@ void Rover::one_second_loop(void)
 
     // send latest param values to wp_nav
     g2.wp_nav.set_turn_params(g2.turn_radius, g2.motors.have_skid_steering());
+    g2.pos_control.set_turn_params(g2.turn_radius, g2.motors.have_skid_steering());
 }
 
 void Rover::update_current_mode(void)

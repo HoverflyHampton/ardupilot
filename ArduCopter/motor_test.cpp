@@ -6,8 +6,6 @@
  */
 
 // motor test definitions
-#define MOTOR_TEST_PWM_MIN              800     // min pwm value accepted by the test
-#define MOTOR_TEST_PWM_MAX              2200    // max pwm value accepted by the test
 #define MOTOR_TEST_TIMEOUT_SEC          600     // max timeout is 10 minutes (600 seconds)
 
 static uint32_t motor_test_start_ms;        // system time the motor test began
@@ -84,7 +82,7 @@ void Copter::motor_test_output()
         }
 
         // sanity check throttle values
-        if (pwm >= MOTOR_TEST_PWM_MIN && pwm <= MOTOR_TEST_PWM_MAX ) {
+        if (pwm >= RC_Channel::RC_MIN_LIMIT_PWM && pwm <= RC_Channel::RC_MAX_LIMIT_PWM) {
             // turn on motor to specified pwm value
             motors->output_test_seq(motor_test_seq, pwm);
         } else {
@@ -161,9 +159,9 @@ MAV_RESULT Copter::mavlink_motor_test_start(const GCS_MAVLINK &gcs_chan, uint8_t
             }
 
             // disable throttle and gps failsafe
-            g.failsafe_throttle = FS_THR_DISABLED;
-            g.failsafe_gcs = FS_GCS_DISABLED;
-            g.fs_ekf_action = 0;
+            g.failsafe_throttle.set(FS_THR_DISABLED);
+            g.failsafe_gcs.set(FS_GCS_DISABLED);
+            g.fs_ekf_action.set(0);
 
             // turn on notify leds
             AP_Notify::flags.esc_calibration = true;

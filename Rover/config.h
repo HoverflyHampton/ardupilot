@@ -14,11 +14,6 @@
 // FrSky telemetry support
 //
 
-#ifndef FRSKY_TELEM_ENABLED
-  #define FRSKY_TELEM_ENABLED ENABLED
-#endif
-
-
 #ifndef CH7_OPTION
   #define CH7_OPTION CH7_SAVE_WP
 #endif
@@ -58,6 +53,12 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
+// Precision Landing with companion computer or IRLock sensor
+#ifndef PRECISION_LANDING
+ # define PRECISION_LANDING ENABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
 // NAVL1
 //
 #ifndef NAVL1
@@ -79,6 +80,12 @@
 #endif
 
 #define DEFAULT_LOG_BITMASK    0xffff
+
+//////////////////////////////////////////////////////////////////////////////
+// Dock mode - allows vehicle to dock to a docking target
+#ifndef MODE_DOCK_ENABLED
+# define MODE_DOCK_ENABLED PRECISION_LANDING
+#endif
 
 
 //////////////////////////////////////////////////////////////////////////////

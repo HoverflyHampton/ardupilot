@@ -135,6 +135,8 @@ IMU Invensense SPI:mpu6000 ROTATION_YAW_180
 
 # one BARO
 BARO BMP280 I2C:0:0x76
+define HAL_PROBE_EXTERNAL_I2C_BAROS
+define HAL_BARO_ALLOW_INIT_NO_BARO
 
 define HAL_OS_FATFS_IO 1
 define HAL_BOARD_LOG_DIRECTORY "/APM/LOGS"
@@ -148,9 +150,8 @@ ROMFS_WILDCARD libraries/AP_OSD/fonts/font*.bin
 
 define STM32_PWM_USE_ADVANCED TRUE
 
-# disable SMBUS and fuel battery monitors to save flash
+# disable SMBUS battery monitors to save flash
 define AP_BATTMON_SMBUS_ENABLE 0
-define AP_BATTMON_FUEL_ENABLE 0
 
 # disable parachute and sprayer to save flash
 define HAL_PARACHUTE_ENABLED 0

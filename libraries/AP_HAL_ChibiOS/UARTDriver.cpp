@@ -573,6 +573,7 @@ __RAMFUNC__ void UARTDriver::rxbuff_full_irq(void* self, uint32_t flags)
           we have data to copy out
          */
         uart_drv->_readbuf.write(uart_drv->rx_bounce_buf[bounce_idx], len);
+        uart_drv->_rx_stats_bytes += len;
         uart_drv->receive_timestamp_update();
     }
 
@@ -634,7 +635,7 @@ void UARTDriver::flush()
         sduSOFHookI((SerialUSBDriver*)sdef.serial);
 #endif
     } else {
-        //TODO: Handle this for other serial ports
+        chEvtSignal(uart_thread_ctx, EVT_TRANSMIT_DATA_READY);
     }
 }
 
@@ -664,20 +665,12 @@ uint32_t UARTDriver::get_usb_baud() const
     return 0;
 }
 
-/* Empty implementations of Stream virtual methods */
 uint32_t UARTDriver::available() {
-    if (!_rx_initialised || lock_read_key) {
+    if (!_rx_initialised || _uart_owner_thd != chThdGetSelfX()) {
         return 0;
     }
-    if (sdef.is_usb) {
-#ifdef HAVE_USB_SERIAL
 
-        if (((SerialUSBDriver*)sdef.serial)->config->usbp->state != USB_ACTIVE) {
-            return 0;
-        }
-#endif
-    }
-    return _readbuf.available();
+    return UARTDriver::available_locked(0);
 }
 
 uint32_t UARTDriver::available_locked(uint32_t key)
@@ -745,22 +738,11 @@ ssize_t UARTDriver::read(uint8_t *buffer, uint16_t count)
 
 int16_t UARTDriver::read()
 {
-    if (lock_read_key != 0 || _uart_owner_thd != chThdGetSelfX()){
-        return -1;
-    }
-    if (!_rx_initialised) {
+    if (_uart_owner_thd != chThdGetSelfX()) {
         return -1;
     }
 
-    uint8_t byte;
-    if (!_readbuf.read_byte(&byte)) {
-        return -1;
-    }
-    if (!_rts_is_active) {
-        update_rts_line();
-    }
-
-    return byte;
+    return UARTDriver::read_locked(0);
 }
 
 int16_t UARTDriver::read_locked(uint32_t key)
@@ -1156,7 +1138,7 @@ void UARTDriver::write_pending_bytes(void)
         }
         if (AP_HAL::micros() - _first_write_started_us > 500*1000UL) {
             // it doesn't look like hw flow control is working
-            hal.console->printf("disabling flow control on serial %u\n", sdef.get_index());
+            DEV_PRINTF("disabling flow control on serial %u\n", sdef.get_index());
             set_flow_control(FLOW_CONTROL_DISABLE);
         }
     }

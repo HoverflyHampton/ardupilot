@@ -35,7 +35,7 @@ void Copter::Log_Write_Control_Tuning()
     float des_alt_m = 0.0f;
     int16_t target_climb_rate_cms = 0;
     if (!flightmode->has_manual_throttle()) {
-        des_alt_m = pos_control->get_pos_target_z_cm() / 100.0f;
+        des_alt_m = pos_control->get_pos_target_z_cm() * 0.01f;
         target_climb_rate_cms = pos_control->get_vel_target_z_cms();
     }
 
@@ -71,7 +71,12 @@ void Copter::Log_Write_Attitude()
     targets.z = wrap_360_cd(targets.z);
     ahrs.Write_Attitude(targets);
     ahrs_view->Write_Rate(*motors, *attitude_control, *pos_control);
-    if (should_log(MASK_LOG_PID)) {
+ }
+
+// Write PIDS packets
+void Copter::Log_Write_PIDS()
+{
+   if (should_log(MASK_LOG_PID)) {
         logger.Write_PID(LOG_PIDR_MSG, attitude_control->get_rate_roll_pid().get_pid_info());
         logger.Write_PID(LOG_PIDP_MSG, attitude_control->get_rate_pitch_pid().get_pid_info());
         logger.Write_PID(LOG_PIDY_MSG, attitude_control->get_rate_yaw_pid().get_pid_info());
@@ -220,21 +225,12 @@ void Copter::Log_Write_Parameter_Tuning(uint8_t param, float tuning_val, float t
     logger.WriteBlock(&pkt_tune, sizeof(pkt_tune));
 }
 
-// logs when baro or compass becomes unhealthy
-void Copter::Log_Sensor_Health()
+void Copter::Log_Video_Stabilisation()
 {
-    // check baro
-    if (sensor_health.baro != barometer.healthy()) {
-        sensor_health.baro = barometer.healthy();
-        AP::logger().Write_Error(LogErrorSubsystem::BARO,
-                                 (sensor_health.baro ? LogErrorCode::ERROR_RESOLVED : LogErrorCode::UNHEALTHY));
+    if (!should_log(MASK_LOG_VIDEO_STABILISATION)) {
+        return;
     }
-
-    // check compass
-    if (sensor_health.compass != compass.healthy()) {
-        sensor_health.compass = compass.healthy();
-        AP::logger().Write_Error(LogErrorSubsystem::COMPASS, (sensor_health.compass ? LogErrorCode::ERROR_RESOLVED : LogErrorCode::UNHEALTHY));
-    }
+    ahrs.write_video_stabilisation();
 }
 
 struct PACKED log_SysIdD {
@@ -591,7 +587,6 @@ void Copter::Log_Write_Data(LogDataID id, int16_t value) {}
 void Copter::Log_Write_Data(LogDataID id, uint16_t value) {}
 void Copter::Log_Write_Data(LogDataID id, float value) {}
 void Copter::Log_Write_Parameter_Tuning(uint8_t param, float tuning_val, float tune_min, float tune_max) {}
-void Copter::Log_Sensor_Health() {}
 void Copter::Log_Write_Guided_Position_Target(ModeGuided::SubMode target_type, const Vector3f& pos_target, bool terrain_alt, const Vector3f& vel_target, const Vector3f& accel_target) {}
 void Copter::Log_Write_Guided_Attitude_Target(ModeGuided::SubMode target_type, float roll, float pitch, float yaw, const Vector3f &ang_vel, float thrust, float climb_rate) {}
 void Copter::Log_Write_SysID_Setup(uint8_t systemID_axis, float waveform_magnitude, float frequency_start, float frequency_stop, float time_fade_in, float time_const_freq, float time_record, float time_fade_out) {}

@@ -3,7 +3,7 @@
 #include "AP_Baro_Backend.h"
 
 #ifndef AP_BARO_ICP201XX_ENABLED
-#define AP_BARO_ICP201XX_ENABLED 1
+#define AP_BARO_ICP201XX_ENABLED AP_BARO_BACKEND_DEFAULT_ENABLED
 #endif
 
 #if AP_BARO_ICP201XX_ENABLED
@@ -81,5 +81,7 @@ private:
 		FORCE_MEAS_TRIGGER_FORCE_MEAS = 1	/* Trigger for forced measurements */
 	} _forced_meas_trigger{FORCED_MEAS_TRIGGER::FORCE_MEAS_STANDBY};
 };
+
+#endif  // AP_BARO_ICP201XX_ENABLED 
 
 #endif  // AP_BARO_ICP201XX_ENABLED 

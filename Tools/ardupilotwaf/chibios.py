@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # encoding: utf-8
 
 """
@@ -14,6 +13,7 @@ import sys
 import re
 import pickle
 import struct
+import base64
 
 _dynamic_env_data = {}
 def _load_dynamic_env_data(bld):
@@ -230,6 +230,29 @@ def to_unsigned(i):
         i += 2**32
     return i
 
+def sign_firmware(image, private_keyfile):
+    '''sign firmware with private key'''
+    try:
+        import monocypher
+    except ImportError:
+        Logs.error("Please install monocypher with: python3 -m pip install pymonocypher")
+        return None
+    try:
+        key = open(private_keyfile, 'r').read()
+    except Exception as ex:
+        Logs.error("Failed to open %s" % private_keyfile)
+        return None
+    keytype = "PRIVATE_KEYV1:"
+    if not key.startswith(keytype):
+        Logs.error("Bad private key file %s" % private_keyfile)
+        return None
+    key = base64.b64decode(key[len(keytype):])
+    sig = monocypher.signature_sign(key, image)
+    sig_len = len(sig)
+    sig_version = 30437
+    return struct.pack("<IQ64s", sig_len+8, sig_version, sig)
+
+
 class set_app_descriptor(Task.Task):
     '''setup app descriptor in bin file'''
     color='BLUE'
@@ -237,7 +260,11 @@ class set_app_descriptor(Task.Task):
     def keyword(self):
         return "app_descriptor"
     def run(self):
-        descriptor = b'\x40\xa2\xe4\xf1\x64\x68\x91\x06'
+        if self.generator.bld.env.AP_SIGNED_FIRMWARE:
+            descriptor = b'\x41\xa3\xe5\xf2\x65\x69\x92\x07'
+        else:
+            descriptor = b'\x40\xa2\xe4\xf1\x64\x68\x91\x06'
+
         img = open(self.inputs[0].abspath(), 'rb').read()
         offset = img.find(descriptor)
         if offset == -1:
@@ -252,11 +279,27 @@ class set_app_descriptor(Task.Task):
         upload_tools = self.env.get_flat('UPLOAD_TOOLS')
         sys.path.append(upload_tools)
         from uploader import crc32
-        desc_len = 16
-        crc1 = to_unsigned(crc32(bytearray(img[:offset])))
-        crc2 = to_unsigned(crc32(bytearray(img[offset+desc_len:])))
+        if self.generator.bld.env.AP_SIGNED_FIRMWARE:
+            desc_len = 92
+        else:
+            desc_len = 16
+        img1 = bytearray(img[:offset])
+        img2 = bytearray(img[offset+desc_len:])
+        crc1 = to_unsigned(crc32(img1))
+        crc2 = to_unsigned(crc32(img2))
         githash = to_unsigned(int('0x' + os.environ.get('GIT_VERSION', self.generator.bld.git_head_hash(short=True)),16))
-        desc = struct.pack('<IIII', crc1, crc2, len(img), githash)
+        if self.generator.bld.env.AP_SIGNED_FIRMWARE:
+            sig = bytearray([0 for i in range(76)])
+            if self.generator.bld.env.PRIVATE_KEY:
+                sig_signed = sign_firmware(img1+img2, self.generator.bld.env.PRIVATE_KEY)
+                if sig_signed:
+                    Logs.info("Signed firmware")
+                    sig = sig_signed
+                else:
+                    self.generator.bld.fatal("Signing failed")
+            desc = struct.pack('<IIII76s', crc1, crc2, len(img), githash, sig)
+        else:
+            desc = struct.pack('<IIII', crc1, crc2, len(img), githash)
         img = img[:offset] + desc + img[offset+desc_len:]
         Logs.info("Applying APP_DESCRIPTOR %08x%08x" % (crc1, crc2))
         open(self.inputs[0].abspath(), 'wb').write(img)
@@ -415,6 +458,12 @@ def setup_canmgr_build(cfg):
         'UAVCAN_NULLPTR=nullptr'
         ]
 
+    if cfg.env.HAL_CANFD_SUPPORTED:
+        env.DEFINES += ['UAVCAN_SUPPORT_CANFD=1']
+    else:
+        env.DEFINES += ['UAVCAN_SUPPORT_CANFD=0']
+
+
     env.INCLUDES += [
         cfg.srcnode.find_dir('modules/uavcan/libuavcan/include').abspath(),
         ]
@@ -453,6 +502,8 @@ def load_env_vars(env):
         env.CHIBIOS_BUILD_FLAGS += ' ENABLE_MALLOC_GUARD=yes'
     if env.ENABLE_STATS:
         env.CHIBIOS_BUILD_FLAGS += ' ENABLE_STATS=yes'
+    if env.ENABLE_DFU_BOOT and env.BOOTLOADER:
+        env.CHIBIOS_BUILD_FLAGS += ' USE_ASXOPT=-DCRT0_ENTRY_HOOK=TRUE'
 
 
 def setup_optimization(env):
@@ -541,6 +592,10 @@ def generate_hwdef_h(env):
             env.HWDEF = os.path.join(env.SRCROOT, 'libraries/AP_HAL_ChibiOS/hwdef/%s/hwdef.dat' % env.BOARD)
         env.BOOTLOADER_OPTION=""
 
+    if env.AP_SIGNED_FIRMWARE:
+        print(env.BOOTLOADER_OPTION)
+        env.BOOTLOADER_OPTION += " --signed-fw"
+        print(env.BOOTLOADER_OPTION)
     hwdef_script = os.path.join(env.SRCROOT, 'libraries/AP_HAL_ChibiOS/hwdef/scripts/chibios_hwdef.py')
     hwdef_out = env.BUILDROOT
     if not os.path.exists(hwdef_out):
@@ -649,6 +704,7 @@ def build(bld):
                 'fiprintf','printf',
                 'fopen', 'fflush', 'fwrite', 'fread', 'fputs', 'fgets',
                 'clearerr', 'fseek', 'ferror', 'fclose', 'tmpfile', 'getc', 'ungetc', 'feof',
-                'ftell', 'freopen', 'remove', 'vfprintf', 'fscanf' ]
+                'ftell', 'freopen', 'remove', 'vfprintf', 'fscanf',
+                '_gettimeofday', '_times', '_times_r', '_gettimeofday_r', 'time', 'clock' ]
     for w in wraplist:
         bld.env.LINKFLAGS += ['-Wl,--wrap,%s' % w]

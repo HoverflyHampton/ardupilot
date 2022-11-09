@@ -85,10 +85,10 @@ public:
     bool usingGPS() const;
 
     // true if source parameters have been configured (used for parameter conversion)
-    bool configured_in_storage();
+    bool configured();
 
-    // mark parameters as configured in storage (used to ensure parameter conversion is only done once)
-    void mark_configured_in_storage();
+    // mark parameters as configured (used to ensure parameter conversion is only done once)
+    void mark_configured();
 
     // returns false if we fail arming checks, in which case the buffer will be populated with a failure message
     // requires_position should be true if horizontal position configuration should be checked
@@ -102,6 +102,9 @@ public:
 
     // return true if wheel encoder is enabled on any source
     bool wheel_encoder_enabled(void) const;
+
+    // returns active source set 
+    uint8_t get_active_source_set() const;
 
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -119,5 +122,5 @@ private:
     AP_Int16 _options;      // source options bitmask
 
     uint8_t active_source_set; // index of active source set
-    bool config_in_storage; // true once configured in storage has returned true
+    bool _configured; // true once configured has returned true
 };

@@ -1,4 +1,3 @@
-#include "mode.h"
 #include "Rover.h"
 
 void ModeManual::_exit()
@@ -37,6 +36,6 @@ void ModeManual::update()
 
     // copy RC scaled inputs to outputs
     g2.motors.set_throttle(desired_throttle);
-    g2.motors.set_steering(desired_steering, false);
+    g2.motors.set_steering(desired_steering, (g2.manual_options & ManualOptions::SPEED_SCALING));
     g2.motors.set_lateral(desired_lateral);
 }

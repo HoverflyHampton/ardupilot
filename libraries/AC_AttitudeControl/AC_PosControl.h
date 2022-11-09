@@ -12,8 +12,6 @@
 #include <AC_PID/AC_PID_2D.h>       // PID library (2-axis)
 #include <AP_InertialNav/AP_InertialNav.h>  // Inertial Navigation library
 #include "AC_AttitudeControl.h"     // Attitude control library
-#include <AP_Motors/AP_Motors.h>    // motors library
-#include <AP_Vehicle/AP_Vehicle.h>  // common vehicle parameters
 
 
 // position controller default definitions
@@ -42,7 +40,7 @@ public:
 
     /// Constructor
     AC_PosControl(AP_AHRS_View& ahrs, const AP_InertialNav& inav,
-                  const AP_Motors& motors, AC_AttitudeControl& attitude_control, float dt);
+                  const class AP_Motors& motors, AC_AttitudeControl& attitude_control, float dt);
 
     /// get_dt - gets time delta in seconds for all position controllers
     float get_dt() const { return _dt; }
@@ -389,15 +387,15 @@ public:
     ///     aircraft when in standby.
     void standby_xyz_reset();
 
+    // get earth-frame Z-axis acceleration with gravity removed in cm/s/s with +ve being up
+    float get_z_accel_cmss() const { return -(_ahrs.get_accel_ef().z + GRAVITY_MSS) * 100.0f; }
+
     static const struct AP_Param::GroupInfo var_info[];
 
 protected:
 
     // get throttle using vibration-resistant calculation (uses feed forward with manually calculated gain)
     float get_throttle_with_vibration_override();
-
-    // get earth-frame Z-axis acceleration with gravity removed in cm/s/s with +ve being up
-    float get_z_accel_cmss() const { return -(_ahrs.get_accel_ef_blended().z + GRAVITY_MSS) * 100.0f; }
 
     // lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
     void accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss, float& roll_target, float& pitch_target) const;
@@ -420,7 +418,7 @@ protected:
     // references to inertial nav and ahrs libraries
     AP_AHRS_View&           _ahrs;
     const AP_InertialNav&   _inav;
-    const AP_Motors&        _motors;
+    const class AP_Motors&        _motors;
     AC_AttitudeControl&     _attitude_control;
 
     // parameters

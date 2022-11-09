@@ -67,6 +67,117 @@ i2c = {}
 ---@return AP_HAL__I2CDevice_ud
 function i2c:get_device(bus, address, clock, smbus) end
 
+-- EFI state structure
+---@class EFI_State_ud
+local EFI_State_ud = {}
+
+---@return EFI_State_ud
+function EFI_State() end
+
+-- set field
+---@param value Cylinder_Status_ud
+function EFI_State_ud:cylinder_status(value) end
+
+-- set field
+---@param value integer
+function EFI_State_ud:ecu_index(value) end
+
+-- set field
+---@param value integer
+function EFI_State_ud:throttle_position_percent(value) end
+
+-- set field
+---@param value number
+function EFI_State_ud:estimated_consumed_fuel_volume_cm3(value) end
+
+-- set field
+---@param value number
+function EFI_State_ud:fuel_consumption_rate_cm3pm(value) end
+
+-- set field
+---@param value number
+function EFI_State_ud:fuel_pressure(value) end
+
+-- set field
+---@param value number
+function EFI_State_ud:oil_temperature(value) end
+
+-- set field
+---@param value number
+function EFI_State_ud:oil_pressure(value) end
+
+-- set field
+---@param value number
+function EFI_State_ud:coolant_temperature(value) end
+
+-- set field
+---@param value number
+function EFI_State_ud:intake_manifold_temperature(value) end
+
+-- set field
+---@param value number
+function EFI_State_ud:intake_manifold_pressure_kpa(value) end
+
+-- set field
+---@param value number
+function EFI_State_ud:atmospheric_pressure_kpa(value) end
+
+-- set field
+---@param value number
+function EFI_State_ud:spark_dwell_time_ms(value) end
+
+-- set field
+---@param value uint32_t_ud
+function EFI_State_ud:engine_speed_rpm(value) end
+
+-- set field
+---@param value integer
+function EFI_State_ud:engine_load_percent(value) end
+
+-- set field
+---@param value boolean
+function EFI_State_ud:general_error(value) end
+
+-- set field
+---@param value uint32_t_ud
+function EFI_State_ud:last_updated_ms(value) end
+
+
+-- EFI Cylinder_Status structure
+---@class Cylinder_Status_ud
+local Cylinder_Status_ud = {}
+
+---@return Cylinder_Status_ud
+function Cylinder_Status() end
+
+-- set field
+---@param value number
+function Cylinder_Status_ud:lambda_coefficient(value) end
+
+-- set field
+---@param value number
+function Cylinder_Status_ud:exhaust_gas_temperature(value) end
+
+-- set field
+---@param value number
+function Cylinder_Status_ud:cylinder_head_temperature(value) end
+
+-- set field
+---@param value number
+function Cylinder_Status_ud:injection_time_ms(value) end
+
+-- set field
+---@param value number
+function Cylinder_Status_ud:ignition_timing_deg(value) end
+
+-- desc
+---@class efi
+efi = {}
+
+-- EFI handle scripting update
+---@param efi_state EFI_State_ud
+function efi:handle_scripting(efi_state) end
+
 
 -- CAN bus interaction
 ---@class CAN
@@ -626,10 +737,12 @@ local AP_HAL__I2CDevice_ud = {}
 ---@param address integer
 function AP_HAL__I2CDevice_ud:set_address(address) end
 
--- desc
+-- If no read length is provided a single register will be read and returned.
+-- If read length is provided a table of register values are returned.
 ---@param register_num integer
----@return integer|nil
-function AP_HAL__I2CDevice_ud:read_registers(register_num) end
+---@param read_length? integer
+---@return integer|table|nil
+function AP_HAL__I2CDevice_ud:read_registers(register_num, read_length) end
 
 -- desc
 ---@param register_num integer
@@ -680,6 +793,10 @@ local RC_Channel_ud = {}
 function RC_Channel_ud:norm_input_ignore_trim() end
 
 -- desc
+---@param PWM integer
+function RC_Channel_ud:set_override(PWM) end
+
+-- desc
 ---@return integer
 function RC_Channel_ud:get_aux_switch_pos() end
 
@@ -690,6 +807,42 @@ function RC_Channel_ud:norm_input() end
 -- desc return input on a channel from -1 to 1, centered on the trim. Returns zero when within deadzone of the trim
 ---@return number
 function RC_Channel_ud:norm_input_dz() end
+
+
+-- desc
+---@class mount
+mount = {}
+
+-- desc
+---@param instance integer
+---@param target_loc Location_ud
+function mount:set_roi_target(instance, target_loc) end
+
+-- desc
+---@param instance integer
+---@param roll_degs number
+---@param pitch_degs number
+---@param yaw_degs number
+---@param yaw_is_earth_frame boolean
+function mount:set_rate_target(instance, roll_degs, pitch_degs, yaw_degs, yaw_is_earth_frame) end
+
+-- desc
+---@param instance integer
+---@param roll_deg number
+---@param pitch_deg number
+---@param yaw_deg number
+---@param yaw_is_earth_frame boolean
+function mount:set_angle_target(instance, roll_deg, pitch_deg, yaw_deg, yaw_is_earth_frame) end
+
+-- desc
+---@param instance integer
+---@param mode integer
+function mount:set_mode(instance, mode) end
+
+-- desc
+---@param instance integer
+---@return integer
+function mount:get_mode(instance) end
 
 
 -- desc
@@ -742,6 +895,9 @@ function periph:get_vehicle_state() end
 ---@return number
 function periph:get_yaw_earth() end
 
+-- desc
+---@param text string
+function periph:can_printf(text) end
 
 -- desc
 ---@class ins
@@ -1070,6 +1226,16 @@ function esc_telem:get_temperature(instance) end
 ---@return number|nil
 function esc_telem:get_rpm(instance) end
 
+-- update RPM for an ESC
+---@param param1 integer -- ESC number
+---@param param2 integer -- RPM
+---@param param3 number -- error rate
+function esc_telem:update_rpm(esc_index, rpm, error_rate) end
+
+-- set scale factor for RPM on a motor
+---@param param1 motor index (0 is first motor)
+---@param param2 scale factor
+function esc_telem:set_rpm_scale(esc_index, scale_factor) end
 
 -- desc
 ---@class optical_flow
@@ -1109,10 +1275,12 @@ function baro:get_pressure() end
 ---@class serial
 serial = {}
 
--- desc
----@param protocol integer
----@return AP_HAL__UARTDriver_ud
-function serial:find_serial(protocol) end
+-- Returns the UART instance that allows connections from scripts (those with SERIALx_PROTOCOL = 28`).
+-- For instance = 0, returns first such UART, second for instance = 1, and so on.
+-- If such an instance is not found, returns nil.
+---@param instance integer -- the 0-based index of the UART instance to return.
+---@return AP_HAL__UARTDriver_ud -- the requested UART instance available for scripting, or nil if none.
+function serial:find_serial(instance) end
 
 
 -- desc
@@ -1127,6 +1295,11 @@ function rc:get_channel(chan_num) end
 -- desc
 ---@return boolean
 function rc:has_valid_input() end
+
+-- return cached level of aux function
+---@param aux_fn integer
+---@return integer|nil
+function rc:get_aux_cached(aux_fn) end
 
 -- desc
 ---@param aux_fun integer
@@ -1481,6 +1654,11 @@ function relay:toggle(instance) end
 ---@return boolean
 function relay:enabled(instance) end
 
+-- return state of a relay
+---@param instance integer
+---@return uint8_t
+function relay:get(instance) end
+
 -- desc
 ---@param instance integer
 function relay:off(instance) end
@@ -1829,6 +2007,10 @@ function arming:arm() end
 -- desc
 ---@return boolean
 function arming:is_armed() end
+
+-- desc
+---@return boolean
+function arming:pre_arm_checks() end
 
 -- desc
 ---@return boolean

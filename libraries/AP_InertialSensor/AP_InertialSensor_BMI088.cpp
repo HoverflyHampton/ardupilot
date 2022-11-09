@@ -28,8 +28,8 @@
 #define REGA_STATUS        0x03
 #define REGA_X_LSB         0x12
 #define REGA_INT_STATUS_1  0x1D
-#define REGA_TEMP_LSB      0x22
-#define REGA_TEMP_MSB      0x23
+#define REGA_TEMP_MSB      0x22
+#define REGA_TEMP_LSB      0x23
 #define REGA_CONF          0x40
 #define REGA_RANGE         0x41
 #define REGA_PWR_CONF      0x7C
@@ -97,7 +97,7 @@ AP_InertialSensor_BMI088::probe(AP_InertialSensor &imu,
 
 void AP_InertialSensor_BMI088::start()
 {
-    if (!_imu.register_accel(accel_instance, ACCEL_BACKEND_SAMPLE_RATE, dev_accel->get_bus_id_devtype(DEVTYPE_INS_BMI088)) ||
+    if (!_imu.register_accel(accel_instance, ACCEL_BACKEND_SAMPLE_RATE, dev_accel->get_bus_id_devtype(_accel_devtype)) ||
         !_imu.register_gyro(gyro_instance, GYRO_BACKEND_SAMPLE_RATE,   dev_gyro->get_bus_id_devtype(DEVTYPE_INS_BMI088))) {
         return;
     }
@@ -155,13 +155,13 @@ static const struct {
     uint8_t value;
 } accel_config[] = {
     { REGA_CONF, 0xAC },
-    // setup 24g range
+    // setup 24g range (16g for BMI085)
     { REGA_RANGE, 0x03 },
     // disable low-power mode
     { REGA_PWR_CONF, 0 },
     { REGA_PWR_CTRL, 0x04 },
     // setup FIFO for streaming X,Y,Z
-    { REGA_FIFO_CONFIG0, 0x00 },
+    { REGA_FIFO_CONFIG0, 0x02 },
     { REGA_FIFO_CONFIG1, 0x50 },
 };
 
@@ -184,7 +184,7 @@ bool AP_InertialSensor_BMI088::setup_accel_config(void)
         }
     }
     done_accel_config = true;
-    hal.console->printf("BMI088: accel config OK (%u tries)\n", (unsigned)accel_config_count);
+    DEV_PRINTF("BMI088: accel config OK (%u tries)\n", (unsigned)accel_config_count);
     return true;
 }
 
@@ -200,15 +200,30 @@ bool AP_InertialSensor_BMI088::accel_init()
     // dummy ready on accel ChipID to init accel (see section 3 of datasheet)
     read_accel_registers(REGA_CHIPID, &v, 1);
 
-    if (!read_accel_registers(REGA_CHIPID, &v, 1) || v != 0x1E) {
+    if (!read_accel_registers(REGA_CHIPID, &v, 1)) {
         return false;
     }
 
-    if (!setup_accel_config()) {
-        hal.console->printf("BMI088: delaying accel config\n");
+    switch (v) {
+        case 0x1E:
+            _accel_devtype = DEVTYPE_INS_BMI088;
+            accel_range = 24.0;
+            hal.console->printf("BMI088: Found device\n");
+            break;
+        case 0x1F:
+            _accel_devtype = DEVTYPE_INS_BMI085;
+            accel_range = 16.0;
+            hal.console->printf("BMI085: Found device\n");
+            break;
+        default:
+            return false;
     }
 
-    hal.console->printf("BMI088: found accel\n");
+    if (!setup_accel_config()) {
+        DEV_PRINTF("BMI08x: delaying accel config\n");
+    }
+
+    DEV_PRINTF("BMI08x: found accel\n");
 
     return true;
 }
@@ -259,7 +274,7 @@ bool AP_InertialSensor_BMI088::gyro_init()
         return false;
     }
 
-    hal.console->printf("BMI088: found gyro\n");    
+    DEV_PRINTF("BMI088: found gyro\n");    
 
     return true;
 }
@@ -304,8 +319,8 @@ void AP_InertialSensor_BMI088::read_fifo_accel(void)
         _inc_accel_error_count(accel_instance);
         return;
     }
-    // assume configured for 24g range
-    const float scale = (1.0/32768.0) * GRAVITY_MSS * 24.0;
+    // use new accel_range depending on sensor type
+    const float scale = (1.0/32768.0) * GRAVITY_MSS * accel_range;
     const uint8_t *p = &data[0];
     while (fifo_length >= 7) {
         /*
@@ -353,7 +368,7 @@ void AP_InertialSensor_BMI088::read_fifo_accel(void)
     if (temperature_counter++ == 100) {
         temperature_counter = 0;
         uint8_t tbuf[2];
-        if (!read_accel_registers(REGA_TEMP_LSB, tbuf, 2)) {
+        if (!read_accel_registers(REGA_TEMP_MSB, tbuf, 2)) {
             _inc_accel_error_count(accel_instance);
         } else {
             uint16_t temp_uint11 = (tbuf[0]<<3) | (tbuf[1]>>5);

@@ -77,7 +77,7 @@ void NavEKF3_core::setWindMagStateLearningMode()
             Vector3F tempEuler;
             stateStruct.quat.to_euler(tempEuler.x, tempEuler.y, tempEuler.z);
             ftype trueAirspeedVariance;
-            const bool haveAirspeedMeasurement = usingDefaultAirspeed || (imuDataDelayed.time_ms - tasDataDelayed.time_ms < 500 && useAirspeed());
+            const bool haveAirspeedMeasurement = usingDefaultAirspeed || (tasDataDelayed.allowFusion && (imuDataDelayed.time_ms - tasDataDelayed.time_ms < 500) && useAirspeed());
             if (haveAirspeedMeasurement) {
                 trueAirspeedVariance = constrain_ftype(tasDataDelayed.tasVariance, WIND_VEL_VARIANCE_MIN, WIND_VEL_VARIANCE_MAX);
                 const ftype windSpeed =  sqrtF(sq(stateStruct.velocity.x) + sq(stateStruct.velocity.y)) - tasDataDelayed.tas;
@@ -299,6 +299,9 @@ void NavEKF3_core::setAidingMode()
             // Check if airspeed data is being used
             bool airSpdUsed = (imuSampleTime_ms - lastTasPassTime_ms <= minTestTime_ms);
 
+            // check if drag data is being used
+            bool dragUsed = (imuSampleTime_ms - lastDragPassTime_ms <= minTestTime_ms);
+
             // Check if range beacon data is being used
             bool rngBcnUsed = (imuSampleTime_ms - lastRngBcnPassTime_ms <= minTestTime_ms);
 
@@ -307,10 +310,10 @@ void NavEKF3_core::setAidingMode()
             bool gpsVelUsed = (imuSampleTime_ms - lastVelPassTime_ms <= minTestTime_ms);
 
             // Check if attitude drift has been constrained by a measurement source
-            bool attAiding = posUsed || gpsVelUsed || optFlowUsed || airSpdUsed || rngBcnUsed || bodyOdmUsed;
+            bool attAiding = posUsed || gpsVelUsed || optFlowUsed || airSpdUsed || dragUsed || rngBcnUsed || bodyOdmUsed;
 
             // check if velocity drift has been constrained by a measurement source
-            bool velAiding = gpsVelUsed || airSpdUsed || optFlowUsed || bodyOdmUsed;
+            bool velAiding = gpsVelUsed || airSpdUsed || dragUsed || optFlowUsed || bodyOdmUsed;
 
             // check if position drift has been constrained by a measurement source
             bool posAiding = posUsed || rngBcnUsed;
@@ -344,6 +347,7 @@ void NavEKF3_core::setAidingMode()
                 posTimeout = true;
                 velTimeout = true;
                 tasTimeout = true;
+                dragTimeout = true;
                 gpsIsInUse = false;
              } else if (posAidLossCritical) {
                 // if the loss of position is critical, declare all sources of position aiding as being timed out
@@ -377,6 +381,9 @@ void NavEKF3_core::setAidingMode()
             meaHgtAtTakeOff = baroDataDelayed.hgt;
             // reset the vertical position state to faster recover from baro errors experienced during touchdown
             stateStruct.position.z = -meaHgtAtTakeOff;
+            // store the current height to be used to keep reporting
+            // the last known position
+            lastKnownPositionD = stateStruct.position.z;
             // reset relative aiding sensor fusion activity status
             flowFusionActive = false;
             bodyVelFusionActive = false;
@@ -683,10 +690,10 @@ void  NavEKF3_core::updateFilterStatus(void)
     filterStatus.value = 0;
     bool doingBodyVelNav = (PV_AidingMode != AID_NONE) && (imuSampleTime_ms - prevBodyVelFuseTime_ms < 5000);
     bool doingFlowNav = (PV_AidingMode != AID_NONE) && flowDataValid;
-    bool doingWindRelNav = !tasTimeout && assume_zero_sideslip();
+    bool doingWindRelNav = (!tasTimeout && assume_zero_sideslip()) || !dragTimeout;
     bool doingNormalGpsNav = !posTimeout && (PV_AidingMode == AID_ABSOLUTE);
     bool someVertRefData = (!velTimeout && (useGpsVertVel || useExtNavVel)) || !hgtTimeout;
-    bool someHorizRefData = !(velTimeout && posTimeout && tasTimeout) || doingFlowNav || doingBodyVelNav;
+    bool someHorizRefData = !(velTimeout && posTimeout && tasTimeout && dragTimeout) || doingFlowNav || doingBodyVelNav;
     bool filterHealthy = healthy() && tiltAlignComplete && (yawAlignComplete || (!use_compass() && (PV_AidingMode != AID_ABSOLUTE)));
 
     // If GPS height usage is specified, height is considered to be inaccurate until the GPS passes all checks
@@ -714,6 +721,7 @@ void  NavEKF3_core::updateFilterStatus(void)
                                             (imuSampleTime_ms - lastTasFailTime_ms) < 1000 &&
                                             (imuSampleTime_ms - lastTasPassTime_ms) > 3000;
     filterStatus.flags.initalized = filterStatus.flags.initalized || healthy();
+    filterStatus.flags.dead_reckoning = (PV_AidingMode != AID_NONE) && doingWindRelNav && !((doingFlowNav && gndOffsetValid) || doingNormalGpsNav || doingBodyVelNav);
 }
 
 void NavEKF3_core::runYawEstimatorPrediction()
@@ -730,7 +738,7 @@ void NavEKF3_core::runYawEstimatorPrediction()
     }
 
     ftype trueAirspeed;
-    if (assume_zero_sideslip()) {
+    if (tasDataDelayed.allowFusion && assume_zero_sideslip()) {
         trueAirspeed = MAX(tasDataDelayed.tas, 0.0f);
     } else {
         trueAirspeed = 0.0f;

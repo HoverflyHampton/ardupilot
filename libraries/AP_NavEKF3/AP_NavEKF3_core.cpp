@@ -226,6 +226,7 @@ void NavEKF3_core::InitialiseVariables()
     gpsNoiseScaler = 1.0f;
     hgtTimeout = true;
     tasTimeout = true;
+    dragTimeout = true;
     badIMUdata = false;
     badIMUdata_ms = 0;
     goodIMUdata_ms = 0;
@@ -236,6 +237,7 @@ void NavEKF3_core::InitialiseVariables()
     dt = 0;
     velDotNEDfilt.zero();
     lastKnownPositionNE.zero();
+    lastKnownPositionD = 0;
     prevTnb.zero();
     memset(&P[0][0], 0, sizeof(P));
     memset(&KH[0][0], 0, sizeof(KH));
@@ -293,9 +295,12 @@ void NavEKF3_core::InitialiseVariables()
     sAccFilterState1 = 0.0f;
     sAccFilterState2 = 0.0f;
     lastGpsCheckTime_ms = 0;
-    lastInnovPassTime_ms = 0;
-    lastInnovFailTime_ms = 0;
+    lastGpsInnovPassTime_ms = 0;
+    lastGpsInnovFailTime_ms = 0;
+    lastGpsVertAccPassTime_ms = 0;
+    lastGpsVertAccFailTime_ms = 0;
     gpsAccuracyGood = false;
+    gpsAccuracyGoodForAltitude = false;
     gpsloc_prev = {};
     gpsDriftNE = 0.0f;
     gpsVertVelFilt = 0.0f;
@@ -1104,6 +1109,10 @@ void NavEKF3_core::CovariancePrediction(Vector3F *rotVarVecPtr)
 
     if (!inhibitWindStates) {
         ftype windVelVar  = sq(dt * constrain_ftype(frontend->_windVelProcessNoise, 0.0f, 1.0f) * (1.0f + constrain_ftype(frontend->_wndVarHgtRateScale, 0.0f, 1.0f) * fabsF(hgtRate)));
+        if (!tasDataDelayed.allowFusion) {
+            // Allow wind states to recover faster when using sideslip fusion with a failed airspeed sesnor
+            windVelVar *= 10.0f;
+        }
         for (uint8_t i=12; i<=13; i++) processNoiseVariance[i] = windVelVar;
     }
 

@@ -20,9 +20,13 @@ void Plane::Log_Write_Attitude(void)
         quadplane.attitude_control->get_attitude_target_quat().to_euler(targets.x, targets.y, targets.z);
         targets *= degrees(100.0f);
         quadplane.ahrs_view->Write_AttitudeView(targets);
-    } else {
+    } else
+#endif
+            {
         ahrs.Write_Attitude(targets);
     }
+
+#if HAL_QUADPLANE_ENABLED
     if (AP_HAL::millis() - quadplane.last_att_control_ms < 100) {
         // log quadplane PIDs separately from fixed wing PIDs
         logger.Write_PID(LOG_PIQR_MSG, quadplane.attitude_control->get_rate_roll_pid().get_pid_info());
@@ -45,17 +49,11 @@ void Plane::Log_Write_Attitude(void)
 }
 
 // do fast logging for plane
-void Plane::Log_Write_Fast(void)
+void Plane::Log_Write_FullRate(void)
 {
-    if (!should_log(MASK_LOG_ATTITUDE_FULLRATE)) {
-        uint32_t now = AP_HAL::millis();
-        if (now - last_log_fast_ms < 40) {
-            // default to 25Hz
-            return;
-        }
-        last_log_fast_ms = now;
-    }
-    if (should_log(MASK_LOG_ATTITUDE_FAST | MASK_LOG_ATTITUDE_FULLRATE)) {
+    // MASK_LOG_ATTITUDE_FULLRATE logs at 400Hz, MASK_LOG_ATTITUDE_FAST at 25Hz, MASK_LOG_ATTIUDE_MED logs at 10Hz
+    // highest rate selected wins
+    if (should_log(MASK_LOG_ATTITUDE_FULLRATE)) {
         Log_Write_Attitude();
     }
 }
@@ -149,7 +147,8 @@ struct PACKED log_Nav_Tuning {
     float   airspeed_error;
     int32_t target_lat;
     int32_t target_lng;
-    int32_t target_alt;
+    int32_t target_alt_wp;
+    int32_t target_alt_tecs;
     int32_t target_airspeed;
 };
 
@@ -168,7 +167,8 @@ void Plane::Log_Write_Nav_Tuning()
         airspeed_error      : airspeed_error,
         target_lat          : next_WP_loc.lat,
         target_lng          : next_WP_loc.lng,
-        target_alt          : next_WP_loc.alt,
+        target_alt_wp       : next_WP_loc.alt,
+        target_alt_tecs     : tecs_target_alt_cm,
         target_airspeed     : target_airspeed_cm,
     };
     logger.WriteBlock(&pkt, sizeof(pkt));
@@ -308,16 +308,17 @@ const struct LogStructure Plane::log_structure[] = {
 // @Field: Dist: distance to the current navigation waypoint
 // @Field: TBrg: bearing to the current navigation waypoint
 // @Field: NavBrg: the vehicle's desired heading
-// @Field: AltErr: difference between current vehicle height and target height
+// @Field: AltE: difference between current vehicle height and target height
 // @Field: XT: the vehicle's current distance from the current travel segment
 // @Field: XTi: integration of the vehicle's crosstrack error
-// @Field: AspdE: difference between vehicle's airspeed and desired airspeed
+// @Field: AsE: difference between vehicle's airspeed and desired airspeed
 // @Field: TLat: target latitude
 // @Field: TLng: target longitude
-// @Field: TAlt: target altitude
-// @Field: TAspd: target airspeed
+// @Field: TAW: target altitude WP
+// @Field: TAT: target altitude TECS
+// @Field: TAsp: target airspeed
     { LOG_NTUN_MSG, sizeof(log_Nav_Tuning),         
-      "NTUN", "QfcccfffLLii",  "TimeUS,Dist,TBrg,NavBrg,AltErr,XT,XTi,AspdE,TLat,TLng,TAlt,TAspd", "smddmmmnDUmn", "F0BBB0B0GGBB" , true },
+      "NTUN", "QfcccfffLLeee",  "TimeUS,Dist,TBrg,NavBrg,AltE,XT,XTi,AsE,TLat,TLng,TAW,TAT,TAsp", "smddmmmnDUmmn", "F0BBB0B0GG000" , true },
 
 // @LoggerMessage: ATRP
 // @Description: Plane AutoTune

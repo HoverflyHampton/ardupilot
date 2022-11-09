@@ -142,7 +142,7 @@ static void handle_get_node_info(CanardInstance* ins,
     pkt.name.len = strlen(CAN_APP_NODE_NAME);
     pkt.name.data = (uint8_t *)name;
 
-    uint16_t total_size = uavcan_protocol_GetNodeInfoResponse_encode(&pkt, buffer);
+    uint16_t total_size = uavcan_protocol_GetNodeInfoResponse_encode(&pkt, buffer, true);
 
     canardRequestOrRespond(ins,
                            transfer->source_node_id,
@@ -272,7 +272,7 @@ static void handle_begin_firmware_update(CanardInstance* ins, CanardRxTransfer* 
     uavcan_protocol_file_BeginFirmwareUpdateResponse reply {};
     reply.error = UAVCAN_PROTOCOL_FILE_BEGINFIRMWAREUPDATE_RESPONSE_ERROR_OK;
 
-    uint32_t total_size = uavcan_protocol_file_BeginFirmwareUpdateResponse_encode(&reply, buffer);
+    uint32_t total_size = uavcan_protocol_file_BeginFirmwareUpdateResponse_encode(&reply, buffer, true);
     canardRequestOrRespond(ins,
                            transfer->source_node_id,
                            UAVCAN_PROTOCOL_FILE_BEGINFIRMWAREUPDATE_SIGNATURE,
@@ -584,7 +584,7 @@ static void send_node_status(void)
     uint8_t buffer[UAVCAN_PROTOCOL_NODESTATUS_MAX_SIZE];
     node_status.uptime_sec = AP_HAL::millis() / 1000U;
 
-    uint32_t len = uavcan_protocol_NodeStatus_encode(&node_status, buffer);
+    uint32_t len = uavcan_protocol_NodeStatus_encode(&node_status, buffer, true);
 
     static uint8_t transfer_id;  // Note that the transfer ID variable MUST BE STATIC (or heap-allocated)!
 

@@ -1,8 +1,6 @@
-#include <AP_HAL/AP_HAL.h>
-
-#if HAL_ENABLE_LIBUAVCAN_DRIVERS
-
 #include "AP_Airspeed_UAVCAN.h"
+
+#if AP_AIRSPEED_UAVCAN_ENABLED
 
 #include <AP_CANManager/AP_CANManager.h>
 #include <AP_UAVCAN/AP_UAVCAN.h>
@@ -16,7 +14,7 @@ extern const AP_HAL::HAL& hal;
 // UAVCAN Frontend Registry Binder
 UC_REGISTRY_BINDER(AirspeedCb, uavcan::equipment::air_data::RawAirData);
 
-AP_Airspeed_UAVCAN::DetectedModules AP_Airspeed_UAVCAN::_detected_modules[] = {0};
+AP_Airspeed_UAVCAN::DetectedModules AP_Airspeed_UAVCAN::_detected_modules[];
 HAL_Semaphore AP_Airspeed_UAVCAN::_sem_registry;
 
 // constructor
@@ -41,7 +39,7 @@ void AP_Airspeed_UAVCAN::subscribe_msgs(AP_UAVCAN* ap_uavcan)
     }
 }
 
-AP_Airspeed_Backend* AP_Airspeed_UAVCAN::probe(AP_Airspeed &_frontend, uint8_t _instance)
+AP_Airspeed_Backend* AP_Airspeed_UAVCAN::probe(AP_Airspeed &_frontend, uint8_t _instance, uint32_t previous_devid)
 {
     WITH_SEMAPHORE(_sem_registry);
 
@@ -49,23 +47,28 @@ AP_Airspeed_Backend* AP_Airspeed_UAVCAN::probe(AP_Airspeed &_frontend, uint8_t _
 
     for (uint8_t i = 0; i < AIRSPEED_MAX_SENSORS; i++) {
         if (_detected_modules[i].driver == nullptr && _detected_modules[i].ap_uavcan != nullptr) {
+            const auto bus_id = AP_HAL::Device::make_bus_id(AP_HAL::Device::BUS_TYPE_UAVCAN,
+                                                            _detected_modules[i].ap_uavcan->get_driver_index(),
+                                                            _detected_modules[i].node_id, 0);
+            if (previous_devid != 0 && previous_devid != bus_id) {
+                // match with previous ID only
+                continue;
+            }
             backend = new AP_Airspeed_UAVCAN(_frontend, _instance);
             if (backend == nullptr) {
-                AP::can().log_text(AP_CANManager::LOG_INFO, 
-                                      LOG_TAG,
-                                      "Failed register UAVCAN Airspeed Node %d on Bus %d\n",
-                                      _detected_modules[i].node_id,
-                                      _detected_modules[i].ap_uavcan->get_driver_index());
+                AP::can().log_text(AP_CANManager::LOG_INFO,
+                                   LOG_TAG,
+                                   "Failed register UAVCAN Airspeed Node %d on Bus %d\n",
+                                   _detected_modules[i].node_id,
+                                   _detected_modules[i].ap_uavcan->get_driver_index());
             } else {
                 _detected_modules[i].driver = backend;
-                AP::can().log_text(AP_CANManager::LOG_INFO, 
-                                      LOG_TAG,
-                                      "Registered UAVCAN Airspeed Node %d on Bus %d\n",
-                                      _detected_modules[i].node_id,
-                                      _detected_modules[i].ap_uavcan->get_driver_index());
-                backend->set_bus_id(AP_HAL::Device::make_bus_id(AP_HAL::Device::BUS_TYPE_UAVCAN,
-                                                                _detected_modules[i].ap_uavcan->get_driver_index(),
-                                                                _detected_modules[i].node_id, 0));
+                AP::can().log_text(AP_CANManager::LOG_INFO,
+                                   LOG_TAG,
+                                   "Registered UAVCAN Airspeed Node %d on Bus %d\n",
+                                   _detected_modules[i].node_id,
+                                   _detected_modules[i].ap_uavcan->get_driver_index());
+                backend->set_bus_id(bus_id);
             }
             break;
         }
@@ -163,4 +166,4 @@ bool AP_Airspeed_UAVCAN::get_temperature(float &temperature)
     return true;
 }
 
-#endif // HAL_ENABLE_LIBUAVCAN_DRIVERS
+#endif // AP_AIRSPEED_UAVCAN_ENABLED

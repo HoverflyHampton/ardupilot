@@ -16,7 +16,8 @@
 
 #pragma once
 
-#include <AP_HAL/AP_HAL.h>
+#include <AP_HAL/AP_HAL_Boards.h>
+#include <AP_HAL/Semaphores.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_Math/AP_Math.h>
 #include <AP_ESC_Telem/AP_ESC_Telem.h>
@@ -25,6 +26,8 @@
 #include <AP_OLC/AP_OLC.h>
 #include <AP_MSP/msp.h>
 #include <AP_Baro/AP_Baro.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>
+#include <AC_Fence/AC_Fence.h>
 
 #ifndef OSD_ENABLED
 #define OSD_ENABLED !HAL_MINIMIZE_FEATURES
@@ -91,7 +94,14 @@ public:
 
 protected:
     bool check_option(uint32_t option);
-
+#ifdef HAL_WITH_MSP_DISPLAYPORT
+    virtual uint8_t get_txt_resolution() const {
+        return 0;
+    }
+    virtual uint8_t get_font_index() const {
+        return 0;
+    }
+#endif
     enum unit_type {
         ALTITUDE=0,
         SPEED=1,
@@ -131,6 +141,14 @@ public:
     static const struct AP_Param::GroupInfo var_info[];
     static const struct AP_Param::GroupInfo var_info2[];
 
+#ifdef HAL_WITH_MSP_DISPLAYPORT
+    uint8_t get_txt_resolution() const override {
+        return txt_resolution;
+    }
+    uint8_t get_font_index() const override {
+        return font_index;
+    }
+#endif
 private:
     friend class AP_MSP;
     friend class AP_MSP_Telem_Backend;
@@ -211,6 +229,12 @@ private:
     AP_OSD_Setting batt_bar{true, 1, 1};
     AP_OSD_Setting arming{true, 1, 1};
 
+#ifdef HAL_WITH_MSP_DISPLAYPORT
+    // Per screen HD resolution options (currently supported only by DisplayPort)
+    AP_Int8 txt_resolution;
+    AP_Int8 font_index;
+#endif
+
     void draw_altitude(uint8_t x, uint8_t y);
     void draw_bat_volt(uint8_t x, uint8_t y);
     void draw_avgcellvolt(uint8_t x, uint8_t y);
@@ -273,9 +297,10 @@ private:
     void draw_current2(uint8_t x, uint8_t y);
     void draw_vtx_power(uint8_t x, uint8_t y);
     void draw_hgt_abvterr(uint8_t x, uint8_t y);
+#if AP_FENCE_ENABLED
     void draw_fence(uint8_t x, uint8_t y);
+#endif
     void draw_rngf(uint8_t x, uint8_t y);
-
 
     struct {
         bool load_attempted;

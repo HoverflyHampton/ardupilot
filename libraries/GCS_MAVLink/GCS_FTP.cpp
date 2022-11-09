@@ -181,7 +181,7 @@ void GCS_MAVLINK::ftp_worker(void) {
     while (true) {
         bool skip_push_reply = false;
 
-        while (!ftp.requests->pop(request)) {
+        while (ftp.requests == nullptr || !ftp.requests->pop(request)) {
             // nothing to handle, delay ourselves a bit then check again. Ideally we'd use conditional waits here
             hal.scheduler->delay(2);
         }
@@ -567,7 +567,7 @@ void GCS_MAVLINK::ftp_worker(void) {
 
 // calculates how much string length is needed to fit this in a list response
 int GCS_MAVLINK::gen_dir_entry(char *dest, size_t space, const char *path, const struct dirent * entry) {
-    const bool is_file = entry->d_type == DT_REG;
+    const bool is_file = entry->d_type == DT_REG || entry->d_type == DT_LNK;
 
     if (space < 3) {
         return -1;
@@ -579,7 +579,12 @@ int GCS_MAVLINK::gen_dir_entry(char *dest, size_t space, const char *path, const
     }
 
     if (is_file) {
-        const size_t full_path_len = strlen(path) + strnlen(entry->d_name, 256); // FIXME: Really should do better then just hardcoding 256
+#ifdef MAX_NAME_LEN
+        const uint8_t max_name_len = MIN(unsigned(MAX_NAME_LEN), 255U);
+#else
+        const uint8_t max_name_len = 255U;
+#endif
+        const size_t full_path_len = strlen(path) + strnlen(entry->d_name, max_name_len);
         char full_path[full_path_len + 2];
         hal.util->snprintf(full_path, sizeof(full_path), "%s/%s", path, entry->d_name);
         struct stat st;

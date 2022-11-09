@@ -52,7 +52,10 @@ public:
     void init(motor_frame_class frame_class, motor_frame_type frame_type) override;
 
     // set frame class (i.e. quad, hexa, heli) and type (i.e. x, plus)
-    void set_frame_class_and_type(motor_frame_class frame_class, motor_frame_type frame_type) override;
+    void set_frame_class_and_type(motor_frame_class frame_class, motor_frame_type frame_type) override {
+        _frame_class = frame_class;
+        _frame_type = frame_type;
+    }
 
     // set update rate to motors - a value in hertz
     virtual void set_update_rate( uint16_t speed_hz ) override = 0;
@@ -108,7 +111,7 @@ public:
 
     // get_motor_mask - returns a bitmask of which outputs are being used for motors or servos (1 means being used)
     //  this can be used to ensure other pwm outputs (i.e. for servos) do not conflict
-    virtual uint16_t get_motor_mask() override = 0;
+    virtual uint32_t get_motor_mask() override = 0;
 
     virtual void set_acro_tail(bool set) {}
 
@@ -140,9 +143,6 @@ public:
     // set_enable_bailout - allows main code to set when RSC can immediately ramp engine instantly
     void set_enable_bailout(bool bailout) { _heliflags.enable_bailout = bailout; }
 
-    // return true if the servo test is still running/pending
-    bool servo_test_running() const { return _heliflags.servo_test_running; }
-
     // set land complete flag
     void set_land_complete(bool landed) { _heliflags.land_complete = landed; }
 
@@ -153,6 +153,9 @@ public:
 
     // use leaking integrator management scheme
     bool using_leaky_integrator() const { return heli_option(HeliOption::USE_LEAKY_I); }
+
+    // Run arming checks
+    bool arming_checks(size_t buflen, char *buffer) const override;
 
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo var_info[];
@@ -198,7 +201,8 @@ protected:
     // reset_swash_servo - free up swash servo for maximum movement
     void reset_swash_servo(SRV_Channel::Aux_servo_function_t function);
 
-    // init_outputs - initialise Servo/PWM ranges and endpoints
+    // init_outputs - initialise Servo/PWM ranges and endpoints.  This
+    // method also updates the initialised flag.
     virtual bool init_outputs() = 0;
 
     // calculate_armed_scalars - must be implemented by child classes

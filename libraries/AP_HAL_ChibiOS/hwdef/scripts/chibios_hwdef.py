@@ -20,6 +20,8 @@ parser.add_argument(
 parser.add_argument(
     '--bootloader', action='store_true', default=False, help='configure for bootloader')
 parser.add_argument(
+    '--signed-fw', action='store_true', default=False, help='configure for signed FW')
+parser.add_argument(
     'hwdef', type=str, nargs='+', default=None, help='hardware definition file')
 parser.add_argument(
     '--params', type=str, default=None, help='user default params path')
@@ -690,6 +692,15 @@ def enable_can(f):
         f.write('#define CAN1_BASE CAN_BASE\n')
     env_vars['HAL_NUM_CAN_IFACES'] = str(len(base_list))
 
+    if mcu_series.startswith("STM32H7") and not args.bootloader:
+        # set maximum supported canfd bit rate in MBits/sec
+        canfd_supported = int(get_config('CANFD_SUPPORTED', 0, default=4, required=False))
+        f.write('#define HAL_CANFD_SUPPORTED %d\n' % canfd_supported)
+        env_vars['HAL_CANFD_SUPPORTED'] = canfd_supported
+    else:
+        canfd_supported = int(get_config('CANFD_SUPPORTED', 0, default=0, required=False))
+        f.write('#define HAL_CANFD_SUPPORTED %d\n' % canfd_supported)
+        env_vars['HAL_CANFD_SUPPORTED'] = canfd_supported
 
 def has_sdcard_spi():
     '''check for sdcard connected to spi bus'''
@@ -701,9 +712,16 @@ def has_sdcard_spi():
 
 def get_ram_map():
     '''get RAM_MAP. May be different for bootloader'''
+    env_vars['APP_RAM_START'] = None
     if args.bootloader:
         ram_map = get_mcu_config('RAM_MAP_BOOTLOADER', False)
         if ram_map is not None:
+            app_ram_map = get_mcu_config('RAM_MAP', True)
+            if app_ram_map[0][0] != ram_map[0][0]:
+                # we need to find the location of app_ram_map[0] in ram_map
+                for i in range(len(ram_map)):
+                    if app_ram_map[0][0] == ram_map[i][0]:
+                        env_vars['APP_RAM_START'] = i
             return ram_map
     elif env_vars['EXT_FLASH_SIZE_MB']:
         ram_map = get_mcu_config('RAM_MAP_EXTERNAL_FLASH', False)
@@ -941,20 +959,25 @@ def write_mcu_config(f):
         f.write('#define CRT1_RAMFUNC_ENABLE FALSE\n')
 
     storage_flash_page = get_storage_flash_page()
+    flash_reserve_end = get_config('FLASH_RESERVE_END_KB', default=0, type=int)
     if storage_flash_page is not None:
         if not args.bootloader:
             f.write('#define STORAGE_FLASH_PAGE %u\n' % storage_flash_page)
             validate_flash_storage_size()
-        else:
+        elif get_config('FLASH_RESERVE_END_KB', type=int, required = False) is None:
             # ensure the flash page leaves room for bootloader
             offset = get_flash_page_offset_kb(storage_flash_page)
+            bl_offset = get_config('FLASH_BOOTLOADER_LOAD_KB', type=int)
+            # storage at end of flash - leave room
+            if offset > bl_offset:
+                flash_reserve_end = flash_size - offset
 
     if flash_size >= 2048 and not args.bootloader:
         # lets pick a flash sector for Crash log
-        f.write('#define HAL_CRASHDUMP_ENABLE 1\n')
+        f.write('#define AP_CRASHDUMP_ENABLED 1\n')
         env_vars['ENABLE_CRASHDUMP'] = 1
     else:
-        f.write('#define HAL_CRASHDUMP_ENABLE 0\n')
+        f.write('#define AP_CRASHDUMP_ENABLED 0\n')
         env_vars['ENABLE_CRASHDUMP'] = 0
 
     if args.bootloader:
@@ -964,7 +987,7 @@ def write_mcu_config(f):
                 'EXT_FLASH_RESERVE_START_KB', default=0, type=int)*1024))
             f.write('#define BOOT_FROM_EXT_FLASH 1\n')
         f.write('#define FLASH_BOOTLOADER_LOAD_KB %u\n' % get_config('FLASH_BOOTLOADER_LOAD_KB', type=int))
-        f.write('#define FLASH_RESERVE_END_KB %u\n' % get_config('FLASH_RESERVE_END_KB', default=0, type=int))
+        f.write('#define FLASH_RESERVE_END_KB %u\n' % flash_reserve_end)
         f.write('#define APP_START_OFFSET_KB %u\n' % get_config('APP_START_OFFSET_KB', default=0, type=int))
     f.write('\n')
 
@@ -974,14 +997,21 @@ def write_mcu_config(f):
     cc_regions = []
     total_memory = 0
     for (address, size, flags) in ram_map:
-        regions.append('{(void*)0x%08x, 0x%08x, 0x%02x }' % (address, size*1024, flags))
         cc_regions.append('{0x%08x, 0x%08x, CRASH_CATCHER_BYTE }' % (address, address + size*1024))
+        if env_vars['APP_RAM_START'] is not None and address == ram_map[env_vars['APP_RAM_START']][0]:
+            ram_reserve_start = get_ram_reserve_start()
+            address += ram_reserve_start
+            size -= ram_reserve_start
+        regions.append('{(void*)0x%08x, 0x%08x, 0x%02x }' % (address, size*1024, flags))
         total_memory += size
     f.write('#define HAL_MEMORY_REGIONS %s\n' % ', '.join(regions))
     f.write('#define HAL_CC_MEMORY_REGIONS %s\n' % ', '.join(cc_regions))
     f.write('#define HAL_MEMORY_TOTAL_KB %u\n' % total_memory)
 
-    f.write('#define HAL_RAM0_START 0x%08x\n' % ram_map[0][0])
+    if env_vars['APP_RAM_START'] is not None:
+        f.write('#define HAL_RAM0_START 0x%08x\n' % ram_map[env_vars['APP_RAM_START']][0])
+    else:
+        f.write('#define HAL_RAM0_START 0x%08x\n' % ram_map[0][0])
     ram_reserve_start = get_ram_reserve_start()
     if ram_reserve_start > 0:
         f.write('#define HAL_RAM_RESERVE_START 0x%08x\n' % ram_reserve_start)
@@ -1031,7 +1061,11 @@ def write_mcu_config(f):
 #endif
 ''')
 
-    if get_mcu_config('EXPECTED_CLOCK', required=True):
+    if get_config('MCU_CLOCKRATE_MHZ', required=False):
+        clockrate = int(get_config('MCU_CLOCKRATE_MHZ'))
+        f.write('#define HAL_CUSTOM_MCU_CLOCKRATE %u\n' % (clockrate * 1000000))
+        f.write('#define HAL_EXPECTED_SYSCLOCK %u\n' % (clockrate * 1000000))
+    elif get_mcu_config('EXPECTED_CLOCK', required=True):
         f.write('#define HAL_EXPECTED_SYSCLOCK %u\n' % get_mcu_config('EXPECTED_CLOCK'))
 
     env_vars['CORTEX'] = cortex
@@ -1082,7 +1116,9 @@ def write_mcu_config(f):
 #define HAL_NO_TIMER_THREAD
 #define HAL_NO_RCOUT_THREAD
 #define HAL_NO_RCIN_THREAD
-#define HAL_NO_SHARED_DMA FALSE
+#ifndef AP_HAL_SHARED_DMA_ENABLED
+#define AP_HAL_SHARED_DMA_ENABLED 0
+#endif
 #define HAL_NO_ROMFS_SUPPORT TRUE
 #define CH_CFG_USE_TM FALSE
 #define CH_CFG_USE_REGISTRY FALSE
@@ -1100,7 +1136,7 @@ def write_mcu_config(f):
 #define DISABLE_SERIAL_ESC_COMM TRUE
 #define CH_CFG_USE_DYNAMIC FALSE
 ''')
-        if not env_vars['EXT_FLASH_SIZE_MB']:
+        if not env_vars['EXT_FLASH_SIZE_MB'] and not args.signed_fw:
             f.write('''
 #define CH_CFG_USE_MEMCORE FALSE
 #define CH_CFG_USE_SEMAPHORES FALSE
@@ -1111,6 +1147,21 @@ def write_mcu_config(f):
 
     if not args.bootloader:
         f.write('''#define STM32_DMA_REQUIRED TRUE\n\n''')
+
+    if args.bootloader:
+        # do not enable flash protection in bootloader, even if hwdef
+        # requests it:
+        f.write('''
+#undef HAL_FLASH_PROTECTION
+#define HAL_FLASH_PROTECTION 0
+''')
+    else:
+        # flash protection is off by default:
+        f.write('''
+#ifndef HAL_FLASH_PROTECTION
+#define HAL_FLASH_PROTECTION 0
+#endif
+''')
 
 def write_ldscript(fname):
     '''write ldscript.ld for this board'''
@@ -1187,11 +1238,12 @@ def write_ldscript(fname):
     f = open(fname, 'w')
     ram0_start = ram_map[0][0]
     ram0_len = ram_map[0][1] * 1024
-
-    # possibly reserve some memory for app/bootloader comms
-    ram_reserve_start = get_ram_reserve_start()
-    ram0_start += ram_reserve_start
-    ram0_len -= ram_reserve_start
+    if env_vars['APP_RAM_START'] is None:
+        # default to start of ram for shared ram
+        # possibly reserve some memory for app/bootloader comms
+        ram_reserve_start = get_ram_reserve_start()
+        ram0_start += ram_reserve_start
+        ram0_len -= ram_reserve_start
     if ext_flash_length == 0 or args.bootloader:
         env_vars['HAS_EXTERNAL_FLASH_SECTIONS'] = 0
         f.write('''/* generated ldscript.ld */
@@ -1258,7 +1310,11 @@ def write_USB_config(f):
     default_product = "%BOARD%"
     if args.bootloader:
         default_product += "-BL"
-    f.write('#define HAL_USB_STRING_PRODUCT %s\n' % get_config("USB_STRING_PRODUCT", default="\"%s\""%default_product))
+    product_string = get_config("USB_STRING_PRODUCT", default="\"%s\""%default_product)
+    if args.bootloader and args.signed_fw:
+        product_string = product_string.replace("-BL", "-Secure-BL-v10")
+    f.write('#define HAL_USB_STRING_PRODUCT %s\n' % product_string)
+    
     f.write('#define HAL_USB_STRING_SERIAL %s\n' % get_config("USB_STRING_SERIAL", default="\"%SERIAL%\""))
 
     f.write('\n\n')
@@ -2255,6 +2311,27 @@ def write_hwdef_header(outfilename):
 
 ''')
 
+    if args.signed_fw:
+        f.write('''
+#define AP_SIGNED_FIRMWARE 1
+''')
+    else:
+        f.write('''
+#define AP_SIGNED_FIRMWARE 0
+''')
+
+    enable_dfu_boot = get_config('ENABLE_DFU_BOOT', default=0)
+    if enable_dfu_boot:
+        env_vars['ENABLE_DFU_BOOT'] = 1
+        f.write('''
+#define HAL_ENABLE_DFU_BOOT TRUE
+''')
+    else:
+        env_vars['ENABLE_DFU_BOOT'] = 0
+        f.write('''
+#define HAL_ENABLE_DFU_BOOT FALSE
+''')
+
     dma_noshare.extend(get_config('DMA_NOSHARE', default='', aslist=True))
 
     write_mcu_config(f)
@@ -2645,6 +2722,9 @@ def process_line(line):
             bylabel.pop(u, '')
             alttype.pop(u, '')
             altlabel.pop(u, '')
+            for dev in spidev:
+                if u == dev[0]:
+                    spidev.remove(dev)
             # also remove all occurences of defines in previous lines if any
             for line in alllines[:]:
                 if line.startswith('define') and u == line.split()[1]:
@@ -2707,12 +2787,15 @@ def add_apperiph_defaults(f):
 #ifndef HAL_SCHEDULER_ENABLED
 #define HAL_SCHEDULER_ENABLED 0
 #endif
+
 #ifndef HAL_LOGGING_ENABLED
 #define HAL_LOGGING_ENABLED 0
 #endif
+
 #ifndef HAL_GCS_ENABLED
 #define HAL_GCS_ENABLED 0
 #endif
+
 // default to no protocols, AP_Periph enables with params
 #define HAL_SERIAL1_PROTOCOL -1
 #define HAL_SERIAL2_PROTOCOL -1
@@ -2722,17 +2805,22 @@ def add_apperiph_defaults(f):
 #ifndef HAL_LOGGING_MAVLINK_ENABLED
 #define HAL_LOGGING_MAVLINK_ENABLED 0
 #endif
-#ifndef HAL_MISSION_ENABLED
-#define HAL_MISSION_ENABLED 0
+
+#ifndef AP_MISSION_ENABLED
+#define AP_MISSION_ENABLED 0
 #endif
+
 #ifndef HAL_RALLY_ENABLED
 #define HAL_RALLY_ENABLED 0
 #endif
+
 #ifndef HAL_CAN_DEFAULT_NODE_ID
 #define HAL_CAN_DEFAULT_NODE_ID 0
 #endif
+
 #define PERIPH_FW TRUE
 #define HAL_BUILD_AP_PERIPH
+
 #ifndef HAL_WATCHDOG_ENABLED_DEFAULT
 #define HAL_WATCHDOG_ENABLED_DEFAULT true
 #endif
@@ -2740,14 +2828,89 @@ def add_apperiph_defaults(f):
 #ifndef AP_FETTEC_ONEWIRE_ENABLED
 #define AP_FETTEC_ONEWIRE_ENABLED 0
 #endif
+
 #ifndef HAL_BARO_WIND_COMP_ENABLED
 #define HAL_BARO_WIND_COMP_ENABLED 0
+#endif
 
 #ifndef HAL_UART_STATS_ENABLED
 #define HAL_UART_STATS_ENABLED (HAL_GCS_ENABLED || HAL_LOGGING_ENABLED)
 #endif
 
+#ifndef AP_AIRSPEED_AUTOCAL_ENABLE
+#define AP_AIRSPEED_AUTOCAL_ENABLE 0
 #endif
+
+#ifndef AP_VOLZ_ENABLED
+#define AP_VOLZ_ENABLED 0
+#endif
+
+#ifndef AP_ROBOTISSERVO_ENABLED
+#define AP_ROBOTISSERVO_ENABLED 0
+#endif
+
+#ifndef AP_STATS_ENABLED
+#define AP_STATS_ENABLED 0
+#endif
+
+/*
+ * GPS Backends - we selectively turn backends on.
+ *   Note also that f103-GPS explicitly disables some of these backends.
+ */
+#define AP_GPS_BACKEND_DEFAULT_ENABLED 0
+
+#ifndef AP_GPS_ERB_ENABLED
+#define AP_GPS_ERB_ENABLED 0
+#endif
+
+#ifndef AP_GPS_GSOF_ENABLED
+#define AP_GPS_GSOF_ENABLED defined(HAL_PERIPH_ENABLE_GPS)
+#endif
+
+#ifndef AP_GPS_NMEA_ENABLED
+#define AP_GPS_NMEA_ENABLED 0
+#endif
+
+#ifndef AP_GPS_SBF_ENABLED
+#define AP_GPS_SBF_ENABLED defined(HAL_PERIPH_ENABLE_GPS)
+#endif
+
+#ifndef AP_GPS_SBP_ENABLED
+#define AP_GPS_SBP_ENABLED 0
+#endif
+
+#ifndef AP_GPS_SBP2_ENABLED
+#define AP_GPS_SBP2_ENABLED 0
+#endif
+
+#ifndef AP_GPS_SIRF_ENABLED
+#define AP_GPS_SIRF_ENABLED 0
+#endif
+
+#ifndef AP_GPS_MAV_ENABLED
+#define AP_GPS_MAV_ENABLED 0
+#endif
+
+#ifndef AP_GPS_NOVA_ENABLED
+#define AP_GPS_NOVA_ENABLED defined(HAL_PERIPH_ENABLE_GPS)
+#endif
+
+#ifndef HAL_SIM_GPS_ENABLED
+#define HAL_SIM_GPS_ENABLED (AP_SIM_ENABLED && defined(HAL_PERIPH_ENABLE_GPS))
+#endif
+
+/*
+ * Airspeed Backends - we selectively turn backends *off*
+ */
+#ifndef AP_AIRSPEED_ANALOG_ENABLED
+#define AP_AIRSPEED_ANALOG_ENABLED 0
+#endif
+
+// disable various rangefinder backends
+#define AP_RANGEFINDER_ANALOG_ENABLED 0
+#define AP_RANGEFINDER_HC_SR04_ENABLED 0
+#define AP_RANGEFINDER_PWM_ENABLED 0
+
 ''')
 
 
@@ -2778,6 +2941,7 @@ write_hwdef_header(os.path.join(outdir, "hwdef.h"))
 write_ldscript(os.path.join(outdir, "ldscript.ld"))
 
 romfs_add_dir(['scripts'])
+romfs_add_dir(['param'])
 
 write_ROMFS(outdir)
 

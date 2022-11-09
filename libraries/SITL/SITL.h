@@ -2,11 +2,12 @@
 
 #include <AP_HAL/AP_HAL_Boards.h>
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#if AP_SIM_ENABLED
 
 #include <AP_Math/AP_Math.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
 #include <AP_Baro/AP_Baro.h>
+#include <AP_Airspeed/AP_Airspeed.h>
 #include <AP_Common/Location.h>
 #include <AP_Compass/AP_Compass.h>
 #include <AP_InertialSensor/AP_InertialSensor.h>
@@ -63,8 +64,8 @@ struct sitl_fdm {
     double battery_current; // Amps
     double battery_remaining; // Ah, if non-zero capacity
     uint8_t num_motors;
-    uint8_t vtol_motor_start;
-    float rpm[12];         // RPM of all motors
+    uint32_t motor_mask;
+    float rpm[32];         // RPM of all motors
     uint8_t rcin_chan_count;
     float  rcin[12];         // RC input 0..1
     double range;           // rangefinder value
@@ -78,7 +79,7 @@ struct sitl_fdm {
     } scanner;
 
     float rangefinder_m[RANGEFINDER_MAX_INSTANCES];
-    float airspeed_raw_pressure[2];
+    float airspeed_raw_pressure[AIRSPEED_MAX_SENSORS];
 
     struct {
         float speed;
@@ -92,16 +93,12 @@ struct sitl_fdm {
 };
 
 // number of rc output channels
-#define SITL_NUM_CHANNELS 16
+#define SITL_NUM_CHANNELS 32
 
 class SIM {
 public:
 
     SIM() {
-        // set a default compass offset
-        for (uint8_t i = 0; i < HAL_COMPASS_MAX_SENSORS; i++) {
-            mag_ofs[i].set(Vector3f(5, 13, -18));
-        }
         AP_Param::setup_object_defaults(this, var_info);
         AP_Param::setup_object_defaults(this, var_info2);
         AP_Param::setup_object_defaults(this, var_info3);
@@ -115,6 +112,13 @@ public:
 #endif // SFML_JOYSTICK
         for (uint8_t i=0; i<BARO_MAX_INSTANCES; i++) {
             AP_Param::setup_object_defaults(&baro[i], baro[i].var_info);
+        }
+        for (uint8_t i=0; i<AIRSPEED_MAX_SENSORS; i++) {
+            AP_Param::setup_object_defaults(&airspeed[i], airspeed[i].var_info);
+        }
+        // set compass offset
+        for (uint8_t i = 0; i < HAL_COMPASS_MAX_SENSORS; i++) {
+            mag_ofs[i].set(Vector3f(5, 13, -18));
         }
         if (_singleton != nullptr) {
             AP_HAL::panic("Too many SITL instances");
@@ -166,12 +170,6 @@ public:
     Matrix3f ahrs_rotation;
     Matrix3f ahrs_rotation_inv;
 
-    AP_Float arspd_noise[2];  // pressure noise
-    AP_Float arspd_fail[2];   // airspeed value in m/s to fail to
-    AP_Float arspd_fail_pressure[2]; // pitot tube failure pressure in Pa
-    AP_Float arspd_fail_pitot_pressure[2]; // pitot tube failure pressure in Pa
-    AP_Float arspd_offset[2]; // airspeed sensor offset in m/s
-
     AP_Float mag_noise;   // in mag units (earth field is 818)
     AP_Vector3f mag_mot;  // in mag units per amp
     AP_Vector3f mag_ofs[HAL_COMPASS_MAX_SENSORS];  // in mag units
@@ -184,6 +182,7 @@ public:
     AP_Float sonar_glitch;// probability between 0-1 that any given sonar sample will read as max distance
     AP_Float sonar_noise; // in metres
     AP_Float sonar_scale; // meters per volt
+    AP_Int8 sonar_rot;  // from rotations enumeration
 
     AP_Float drift_speed; // degrees/second/minute
     AP_Float drift_time;  // period in minutes
@@ -232,6 +231,7 @@ public:
     AP_Int32 mag_devid[MAX_CONNECTED_MAGS]; // Mag devid
     AP_Float buoyancy; // submarine buoyancy in Newtons
     AP_Int16 loop_rate_hz;
+    AP_Int32 on_hardware_output_enable_mask;  // mask of output channels passed through to actual hardware
 
 #ifdef SFML_JOYSTICK
     AP_Int8 sfml_joystick_id;
@@ -257,6 +257,20 @@ public:
     };
     BaroParm baro[BARO_MAX_INSTANCES];
 
+    // airspeed parameters
+    class AirspeedParm {
+    public:
+        static const struct AP_Param::GroupInfo var_info[];
+        AP_Float noise;  // pressure noise
+        AP_Float fail;   // airspeed value in m/s to fail to
+        AP_Float fail_pressure; // pitot tube failure pressure in Pa
+        AP_Float fail_pitot_pressure; // pitot tube failure pressure in Pa
+        AP_Float offset; // airspeed sensor offset in m/s
+        AP_Float ratio; // airspeed ratios
+        AP_Int8  signflip;
+    };
+    AirspeedParm airspeed[AIRSPEED_MAX_SENSORS];
+    
     // EFI type
     enum EFIType {
         EFI_TYPE_NONE = 0,
@@ -284,7 +298,6 @@ public:
     AP_Float wind_type_coef;
 
     AP_Int16  mag_delay; // magnetometer data delay in ms
-    AP_Int16  wind_delay; // windspeed data delay in ms
 
     // ADSB related run-time options
     AP_Int16 adsb_plane_count;
@@ -310,9 +323,6 @@ public:
     
     AP_Int8 thermal_scenario;
 
-    // differential pressure sensor tube order
-    AP_Int8 arspd_signflip;
-
     // weight on wheels pin
     AP_Int8 wow_pin;
 
@@ -323,6 +333,13 @@ public:
     AP_Float vibe_motor;
     // amplitude scaling of motor noise relative to gyro/accel noise
     AP_Float vibe_motor_scale;
+
+    // what harmonics to generate
+    AP_Int16 vibe_motor_harmonics;
+
+    // what servos are motors
+    AP_Int32 vibe_motor_mask;
+    
     // minimum throttle for addition of ins noise
     AP_Float ins_noise_throttle_min;
 
@@ -373,10 +390,10 @@ public:
         return (AP_HAL::Util::safety_state)_safety_switch_state.get();
     }
     void force_safety_off() {
-        _safety_switch_state = (uint8_t)AP_HAL::Util::SAFETY_ARMED;
+        _safety_switch_state.set((uint8_t)AP_HAL::Util::SAFETY_ARMED);
     }
     bool force_safety_on() {
-        _safety_switch_state = (uint8_t)AP_HAL::Util::SAFETY_DISARMED;
+        _safety_switch_state.set((uint8_t)AP_HAL::Util::SAFETY_DISARMED);
         return true;
     }
 
@@ -427,6 +444,8 @@ public:
 
     // ESC telemetry
     AP_Int8 esc_telem;
+    // RPM when motors are armed
+    AP_Float esc_rpm_armed;
 
     struct {
         // LED state, for serial LED emulation
@@ -449,6 +468,8 @@ public:
 
     // get the rangefinder reading for the desired instance, returns -1 for no data
     float get_rangefinder(uint8_t instance);
+
+    float measure_distance_at_angle_bf(const Location &location, float angle) const;
 
     // get the apparent wind speed and direction as set by external physics backend
     float get_apparent_wind_dir() const{return state.wind_vane_apparent.direction;}
@@ -489,4 +510,4 @@ namespace AP {
     SITL::SIM *sitl();
 };
 
-#endif // CONFIG_HAL_BOARD
+#endif // AP_SIM_ENABLED

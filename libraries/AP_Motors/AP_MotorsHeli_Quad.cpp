@@ -67,7 +67,7 @@ bool AP_MotorsHeli_Quad::init_outputs()
         _main_rotor.set_ext_gov_arot_bail(0);
     }
 
-    set_initialised_ok(true);
+    set_initialised_ok(_frame_class == MOTOR_FRAME_HELI_QUAD);
 
     return true;
 }
@@ -132,13 +132,13 @@ void AP_MotorsHeli_Quad::calculate_scalars()
 {
     // range check collective min, max and mid
     if( _collective_min >= _collective_max ) {
-        _collective_min = AP_MOTORS_HELI_COLLECTIVE_MIN;
-        _collective_max = AP_MOTORS_HELI_COLLECTIVE_MAX;
+        _collective_min.set(AP_MOTORS_HELI_COLLECTIVE_MIN);
+        _collective_max.set(AP_MOTORS_HELI_COLLECTIVE_MAX);
     }
 
-    _collective_zero_thrust_deg = constrain_float(_collective_zero_thrust_deg, _collective_min_deg, _collective_max_deg);
+    _collective_zero_thrust_deg.set(constrain_float(_collective_zero_thrust_deg, _collective_min_deg, _collective_max_deg));
 
-    _collective_land_min_deg = constrain_float(_collective_land_min_deg, _collective_min_deg, _collective_max_deg);
+    _collective_land_min_deg.set(constrain_float(_collective_land_min_deg, _collective_min_deg, _collective_max_deg));
 
     if (!is_equal((float)_collective_max_deg, (float)_collective_min_deg)) {
         // calculate collective zero thrust point as a number from 0 to 1
@@ -183,9 +183,9 @@ void AP_MotorsHeli_Quad::calculate_roll_pitch_collective_factors()
 
 // get_motor_mask - returns a bitmask of which outputs are being used for motors or servos (1 means being used)
 //  this can be used to ensure other pwm outputs (i.e. for servos) do not conflict
-uint16_t AP_MotorsHeli_Quad::get_motor_mask()
+uint32_t AP_MotorsHeli_Quad::get_motor_mask()
 {
-    uint16_t mask = 0;
+    uint32_t mask = 0;
     for (uint8_t i=0; i<AP_MOTORS_HELI_QUAD_NUM_MOTORS; i++) {
         mask |= 1U << (AP_MOTORS_MOT_1+i);
     }

@@ -17,6 +17,18 @@ const AP_Param::GroupInfo AP_Arming_Plane::var_info[] = {
     AP_GROUPEND
 };
 
+// expected to return true if the terrain database is required to have
+// all data loaded
+bool AP_Arming_Plane::terrain_database_required() const
+{
+#if AP_TERRAIN_AVAILABLE
+    if (plane.g.terrain_follow) {
+        return true;
+    }
+#endif
+    return AP_Arming::terrain_database_required();
+}
+
 /*
   additional arming checks for plane
 
@@ -66,6 +78,11 @@ bool AP_Arming_Plane::pre_arm_checks(bool display_failure)
         ret = false;
     }
 
+    if (plane.aparm.airspeed_min < MIN_AIRSPEED_MIN) {
+        check_failed(display_failure, "ARSPD_FBW_MIN too low (%i < %i)", plane.aparm.airspeed_min.get(), MIN_AIRSPEED_MIN);
+        ret = false;
+    }
+
     if (plane.channel_throttle->get_reverse() && 
         Plane::ThrFailsafe(plane.g.throttle_fs_enabled.get()) != Plane::ThrFailsafe::Disabled &&
         plane.g.throttle_fs_value < 
@@ -102,7 +119,8 @@ bool AP_Arming_Plane::pre_arm_checks(bool display_failure)
        }
     }
 
-    if (plane.mission.get_in_landing_sequence_flag()) {
+    if (plane.mission.get_in_landing_sequence_flag() &&
+        !plane.mission.starts_with_takeoff_cmd()) {
         check_failed(display_failure,"In landing sequence");
         ret = false;
     }
@@ -129,8 +147,9 @@ bool AP_Arming_Plane::quadplane_checks(bool display_failure)
         ret = false;
     }
 
-    if (!plane.quadplane.motors->initialised_ok()) {
-        check_failed(display_failure, "Quadplane: check motor setup");
+    char failure_msg[50] {};
+    if (!plane.quadplane.motors->arming_checks(ARRAY_SIZE(failure_msg), failure_msg)) {
+        check_failed(display_failure, "Motors: %s", failure_msg);
         ret = false;
     }
 
@@ -158,7 +177,6 @@ bool AP_Arming_Plane::quadplane_checks(bool display_failure)
     }
 
     // ensure controllers are OK with us arming:
-    char failure_msg[50];
     if (!plane.quadplane.pos_control->pre_arm_checks("PSC", failure_msg, ARRAY_SIZE(failure_msg))) {
         check_failed(ARMING_CHECK_PARAMETERS, display_failure, "Bad parameter: %s", failure_msg);
         ret = false;
@@ -172,7 +190,7 @@ bool AP_Arming_Plane::quadplane_checks(bool display_failure)
         ret = false;
     }
 
-    if ((plane.quadplane.options & QuadPlane::OPTION_ONLY_ARM_IN_QMODE_OR_AUTO) != 0) {
+    if (plane.quadplane.option_is_set(QuadPlane::OPTION::ONLY_ARM_IN_QMODE_OR_AUTO)) {
         if (!plane.control_mode->is_vtol_mode() && (plane.control_mode != &plane.mode_auto) && (plane.control_mode != &plane.mode_guided)) {
             check_failed(display_failure,"not in Q mode");
             ret = false;
@@ -394,7 +412,7 @@ bool AP_Arming_Plane::mission_checks(bool report)
 #if HAL_QUADPLANE_ENABLED
     if (plane.quadplane.available()) {
         const uint16_t num_commands = plane.mission.num_commands();
-        AP_Mission::Mission_Command prev_cmd;
+        AP_Mission::Mission_Command prev_cmd {};
         for (uint16_t i=1; i<num_commands; i++) {
             AP_Mission::Mission_Command cmd;
             if (!plane.mission.read_cmd_from_storage(i, cmd)) {

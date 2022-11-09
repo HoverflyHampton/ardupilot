@@ -203,7 +203,7 @@ void RC_Channel_Plane::init_aux_function(const RC_Channel::aux_func_t ch_option,
     }
 }
 
-// do_aux_function - implement the function invoked by auxillary switches
+// do_aux_function - implement the function invoked by auxiliary switches
 bool RC_Channel_Plane::do_aux_function(const aux_func_t ch_option, const AuxSwitchPos ch_flag)
 {
     switch(ch_option) {
@@ -319,9 +319,9 @@ bool RC_Channel_Plane::do_aux_function(const aux_func_t ch_option, const AuxSwit
         break;
 #endif
 
-case AUX_FUNC::ARSPD_CALIBRATE:
+    case AUX_FUNC::ARSPD_CALIBRATE:
 #if AP_AIRSPEED_AUTOCAL_ENABLE
-       switch (ch_flag) {
+        switch (ch_flag) {
         case AuxSwitchPos::HIGH:
             plane.airspeed.set_calibration_enabled(true);
             break;
@@ -334,9 +334,9 @@ case AUX_FUNC::ARSPD_CALIBRATE:
 #endif
         break;
 
-   case AUX_FUNC::LANDING_FLARE:
-       do_aux_function_flare(ch_flag);
-       break;
+    case AUX_FUNC::LANDING_FLARE:
+        do_aux_function_flare(ch_flag);
+        break;
 
     case AUX_FUNC::PARACHUTE_RELEASE:
 #if PARACHUTE == ENABLED

@@ -34,6 +34,7 @@
 #include <AP_Logger/AP_Logger.h>
 #endif
 #include <AP_Vehicle/AP_Vehicle_Type.h>
+#include <AP_HAL/SIMState.h>
 
 #include <hwdef.h>
 
@@ -97,6 +98,10 @@ static ChibiOS::Scheduler schedulerInstance;
 static ChibiOS::Util utilInstance;
 static Empty::OpticalFlow opticalFlowDriver;
 
+#if AP_SIM_ENABLED
+static AP_HAL::SIMState xsimstate;
+#endif
+
 #if HAL_WITH_DSP
 static ChibiOS::DSP dspDriver;
 #else
@@ -152,6 +157,9 @@ HAL_ChibiOS::HAL_ChibiOS() :
         &utilInstance,
         &opticalFlowDriver,
         &flashDriver,
+#if AP_SIM_ENABLED
+        &xsimstate,
+#endif
         &dspDriver,
 #if HAL_NUM_CAN_IFACES
         (AP_HAL::CANIface**)canDrivers
@@ -205,7 +213,7 @@ static void main_loop()
     ChibiOS::I2CBus::clear_all();
 #endif
 
-#ifndef HAL_NO_SHARED_DMA
+#if AP_HAL_SHARED_DMA_ENABLED
     ChibiOS::Shared_DMA::init();
 #endif
 
@@ -241,7 +249,7 @@ static void main_loop()
     utilInstance.apply_persistent_params();
 #endif
 
-#ifdef HAL_FLASH_PROTECTION
+#if HAL_FLASH_PROTECTION
     if (AP_BoardConfig::unlock_flash()) {
         stm32_flash_unprotect_flash();
     } else {

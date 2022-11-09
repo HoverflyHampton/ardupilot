@@ -17,6 +17,7 @@
 #include "RPM_Pin.h"
 #include "RPM_SITL.h"
 #include "RPM_EFI.h"
+#include "RPM_Generator.h"
 #include "RPM_HarmonicNotch.h"
 #include "RPM_ESC_Telem.h"
 
@@ -80,6 +81,11 @@ void AP_RPM::init(void)
             drivers[i] = new AP_RPM_EFI(*this, i, state[i]);
             break;
 #endif
+#if HAL_GENERATOR_ENABLED
+        case RPM_TYPE_GENERATOR:
+            drivers[i] = new AP_RPM_Generator(*this, i, state[i]);
+            break;
+#endif
         // include harmonic notch last
         // this makes whatever process is driving the dynamic notch appear as an RPM value
         case RPM_TYPE_HNTCH:
@@ -104,8 +110,8 @@ PARAMETER_CONVERSION - Added: Aug-2021
 */
 void AP_RPM::convert_params(void)
 {
-    if (_params[0].type.configured_in_storage()) {
-        // _params[0].type will always be configured in storage after conversion is done the first time
+    if (_params[0].type.configured()) {
+        // _params[0].type will always be configured after conversion is done the first time
         return;
     }
 
@@ -189,9 +195,11 @@ void AP_RPM::update(void)
         }
     }
 
+#if HAL_LOGGING_ENABLED
     if (enabled(0) || enabled(1)) {
-        AP::logger().Write_RPM(*this);
+        Log_RPM();
     }
+#endif
 }
 
 /*
@@ -263,6 +271,24 @@ bool AP_RPM::arming_checks(size_t buflen, char *buffer) const
     }
     return true;
 }
+
+#if HAL_LOGGING_ENABLED
+void AP_RPM::Log_RPM()
+{
+    float rpm1 = -1, rpm2 = -1;
+
+    get_rpm(0, rpm1);
+    get_rpm(1, rpm2);
+
+    const struct log_RPM pkt{
+        LOG_PACKET_HEADER_INIT(LOG_RPM_MSG),
+        time_us     : AP_HAL::micros64(),
+        rpm1        : rpm1,
+        rpm2        : rpm2
+    };
+    AP::logger().WriteBlock(&pkt, sizeof(pkt));
+}
+#endif
 
 // singleton instance
 AP_RPM *AP_RPM::_singleton;

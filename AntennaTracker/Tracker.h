@@ -27,7 +27,6 @@
 #include <stdio.h>
 
 #include <AP_Common/AP_Common.h>
-#include <AP_HAL/AP_HAL.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_Math/AP_Math.h>        // ArduPilot Mega Vector/Matrix math Library
 #include <AP_AHRS/AP_AHRS.h>         // ArduPilot Mega DCM Library
@@ -38,6 +37,7 @@
 #include <AP_NavEKF2/AP_NavEKF2.h>
 #include <AP_NavEKF3/AP_NavEKF3.h>
 
+#include <SRV_Channel/SRV_Channel.h>
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <AP_Mission/AP_Mission.h>
 #include <AP_Stats/AP_Stats.h>                      // statistics library

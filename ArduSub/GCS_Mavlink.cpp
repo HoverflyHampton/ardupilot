@@ -1,6 +1,7 @@
 #include "Sub.h"
 
 #include "GCS_Mavlink.h"
+#include <AP_RPM/AP_RPM_config.h>
 
 MAV_TYPE GCS_Sub::frame_type() const
 {
@@ -154,7 +155,7 @@ void GCS_MAVLINK_Sub::send_pid_tuning()
 
     const Vector3f &gyro = ahrs.get_gyro();
     if (g.gcs_pid_mask & 1) {
-        const AP_Logger::PID_Info &pid_info = attitude_control.get_rate_roll_pid().get_pid_info();
+        const AP_PIDInfo &pid_info = attitude_control.get_rate_roll_pid().get_pid_info();
         mavlink_msg_pid_tuning_send(chan, PID_TUNING_ROLL,
                                     pid_info.target*0.01f,
                                     degrees(gyro.x),
@@ -169,7 +170,7 @@ void GCS_MAVLINK_Sub::send_pid_tuning()
         }
     }
     if (g.gcs_pid_mask & 2) {
-        const AP_Logger::PID_Info &pid_info = attitude_control.get_rate_pitch_pid().get_pid_info();
+        const AP_PIDInfo &pid_info = attitude_control.get_rate_pitch_pid().get_pid_info();
         mavlink_msg_pid_tuning_send(chan, PID_TUNING_PITCH,
                                     pid_info.target*0.01f,
                                     degrees(gyro.y),
@@ -184,7 +185,7 @@ void GCS_MAVLINK_Sub::send_pid_tuning()
         }
     }
     if (g.gcs_pid_mask & 4) {
-        const AP_Logger::PID_Info &pid_info = attitude_control.get_rate_yaw_pid().get_pid_info();
+        const AP_PIDInfo &pid_info = attitude_control.get_rate_yaw_pid().get_pid_info();
         mavlink_msg_pid_tuning_send(chan, PID_TUNING_YAW,
                                     pid_info.target*0.01f,
                                     degrees(gyro.z),
@@ -199,10 +200,10 @@ void GCS_MAVLINK_Sub::send_pid_tuning()
         }
     }
     if (g.gcs_pid_mask & 8) {
-        const AP_Logger::PID_Info &pid_info = sub.pos_control.get_accel_z_pid().get_pid_info();
+        const AP_PIDInfo &pid_info = sub.pos_control.get_accel_z_pid().get_pid_info();
         mavlink_msg_pid_tuning_send(chan, PID_TUNING_ACCZ,
                                     pid_info.target*0.01f,
-                                    -(ahrs.get_accel_ef_blended().z + GRAVITY_MSS),
+                                    -(ahrs.get_accel_ef().z + GRAVITY_MSS),
                                     pid_info.FF*0.01f,
                                     pid_info.P*0.01f,
                                     pid_info.I*0.01f,
@@ -255,6 +256,7 @@ const AP_Param::GroupInfo GCS_MAVLINK_Parameters::var_info[] = {
     // @Units: Hz
     // @Range: 0 50
     // @Increment: 1
+    // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("RAW_SENS", 0, GCS_MAVLINK_Parameters, streamRates[GCS_MAVLINK::STREAM_RAW_SENSORS],  0),
 
@@ -264,6 +266,7 @@ const AP_Param::GroupInfo GCS_MAVLINK_Parameters::var_info[] = {
     // @Units: Hz
     // @Range: 0 50
     // @Increment: 1
+    // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("EXT_STAT", 1, GCS_MAVLINK_Parameters, streamRates[GCS_MAVLINK::STREAM_EXTENDED_STATUS],  0),
 
@@ -273,6 +276,7 @@ const AP_Param::GroupInfo GCS_MAVLINK_Parameters::var_info[] = {
     // @Units: Hz
     // @Range: 0 50
     // @Increment: 1
+    // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("RC_CHAN",  2, GCS_MAVLINK_Parameters, streamRates[GCS_MAVLINK::STREAM_RC_CHANNELS],  0),
 
@@ -282,6 +286,7 @@ const AP_Param::GroupInfo GCS_MAVLINK_Parameters::var_info[] = {
     // @Units: Hz
     // @Range: 0 50
     // @Increment: 1
+    // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("POSITION", 4, GCS_MAVLINK_Parameters, streamRates[GCS_MAVLINK::STREAM_POSITION],  0),
 
@@ -291,6 +296,7 @@ const AP_Param::GroupInfo GCS_MAVLINK_Parameters::var_info[] = {
     // @Units: Hz
     // @Range: 0 50
     // @Increment: 1
+    // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("EXTRA1",   5, GCS_MAVLINK_Parameters, streamRates[GCS_MAVLINK::STREAM_EXTRA1],  0),
 
@@ -300,6 +306,7 @@ const AP_Param::GroupInfo GCS_MAVLINK_Parameters::var_info[] = {
     // @Units: Hz
     // @Range: 0 50
     // @Increment: 1
+    // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("EXTRA2",   6, GCS_MAVLINK_Parameters, streamRates[GCS_MAVLINK::STREAM_EXTRA2],  0),
 
@@ -309,6 +316,7 @@ const AP_Param::GroupInfo GCS_MAVLINK_Parameters::var_info[] = {
     // @Units: Hz
     // @Range: 0 50
     // @Increment: 1
+    // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("EXTRA3",   7, GCS_MAVLINK_Parameters, streamRates[GCS_MAVLINK::STREAM_EXTRA3],  0),
 
@@ -318,6 +326,7 @@ const AP_Param::GroupInfo GCS_MAVLINK_Parameters::var_info[] = {
     // @Units: Hz
     // @Range: 0 50
     // @Increment: 1
+    // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("PARAMS",   8, GCS_MAVLINK_Parameters, streamRates[GCS_MAVLINK::STREAM_PARAMS],  0),
     AP_GROUPEND
@@ -374,9 +383,8 @@ static const ap_message STREAM_EXTRA3_msgs[] = {
 #endif
     MSG_BATTERY2,
     MSG_BATTERY_STATUS,
-    MSG_MOUNT_STATUS,
+    MSG_GIMBAL_DEVICE_ATTITUDE_STATUS,
     MSG_OPTICAL_FLOW,
-    MSG_GIMBAL_REPORT,
     MSG_MAG_CAL_REPORT,
     MSG_MAG_CAL_PROGRESS,
     MSG_EKF_STATUS_REPORT,
@@ -652,6 +660,7 @@ void GCS_MAVLINK_Sub::handleMessage(const mavlink_message_t &msg)
             break;
         }
 
+        bool z_ignore        = packet.type_mask & MAVLINK_SET_POS_TYPE_MASK_Z_IGNORE;
         bool pos_ignore      = packet.type_mask & MAVLINK_SET_POS_TYPE_MASK_POS_IGNORE;
         bool vel_ignore      = packet.type_mask & MAVLINK_SET_POS_TYPE_MASK_VEL_IGNORE;
         bool acc_ignore      = packet.type_mask & MAVLINK_SET_POS_TYPE_MASK_ACC_IGNORE;
@@ -663,7 +672,7 @@ void GCS_MAVLINK_Sub::handleMessage(const mavlink_message_t &msg)
          * bool yaw_rate_ignore = packet.type_mask & MAVLINK_SET_POS_TYPE_MASK_YAW_RATE_IGNORE;
          */
 
-        if (!pos_ignore && sub.control_mode == ALT_HOLD) { // Control only target depth when in ALT_HOLD
+        if (!z_ignore && sub.control_mode == ALT_HOLD) { // Control only target depth when in ALT_HOLD
             sub.pos_control.set_pos_target_z_cm(packet.alt*100);
             break;
         }
@@ -708,30 +717,6 @@ void GCS_MAVLINK_Sub::handleMessage(const mavlink_message_t &msg)
         sub.terrain.handle_data(chan, msg);
 #endif
         break;
-
-    case MAVLINK_MSG_ID_SET_HOME_POSITION: {
-        send_received_message_deprecation_warning(STR_VALUE(MAVLINK_MSG_ID_SET_HOME_POSITION));
-
-        mavlink_set_home_position_t packet;
-        mavlink_msg_set_home_position_decode(&msg, &packet);
-        if ((packet.latitude == 0) && (packet.longitude == 0) && (packet.altitude == 0)) {
-            if (!sub.set_home_to_current_location(true)) {
-                // ignore this failure
-            }
-        } else {
-            Location new_home_loc;
-            new_home_loc.lat = packet.latitude;
-            new_home_loc.lng = packet.longitude;
-            new_home_loc.alt = packet.altitude / 10;
-            if (sub.far_from_EKF_origin(new_home_loc)) {
-                break;
-            }
-            if (!sub.set_home(new_home_loc, true)) {
-                // silently ignored
-            }
-        }
-        break;
-    }
 
     // This adds support for leak detectors in a separate enclosure
     // connected to a mavlink enabled subsystem

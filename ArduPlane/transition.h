@@ -13,7 +13,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #pragma once
-#include <GCS_MAVLink/GCS.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>
 
 class QuadPlane;
 class AP_MotorsMulticopter;
@@ -28,13 +28,13 @@ public:
 
     virtual void VTOL_update() = 0;
 
-    virtual void force_transistion_complete() = 0;
+    virtual void force_transition_complete() = 0;
 
     virtual bool complete() const = 0;
 
     virtual void restart() = 0;
 
-    virtual uint8_t get_log_transision_state() const = 0;
+    virtual uint8_t get_log_transition_state() const = 0;
 
     virtual bool active() const = 0;
 
@@ -75,17 +75,19 @@ public:
 
     void VTOL_update() override;
 
-    void force_transistion_complete() override;
+    void force_transition_complete() override;
 
     bool complete() const override { return transition_state == TRANSITION_DONE; }
 
     void restart() override { transition_state = TRANSITION_AIRSPEED_WAIT; }
 
-    uint8_t get_log_transision_state() const override { return static_cast<uint8_t>(transition_state); }
+    uint8_t get_log_transition_state() const override { return static_cast<uint8_t>(transition_state); }
 
     bool active() const override;
 
     bool show_vtol_view() const override;
+
+    void set_FW_roll_pitch(int32_t& nav_pitch_cd, int32_t& nav_roll_cd, bool& allow_stick_mixing) override;
 
     bool set_FW_roll_limit(int32_t& roll_limit_cd) override;
 

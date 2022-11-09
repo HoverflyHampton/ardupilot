@@ -32,7 +32,6 @@
 #include <AP_Common/Location.h>
 #include <AP_Param/AP_Param.h>
 #include <StorageManager/StorageManager.h>
-#include <GCS_MAVLink/GCS.h>
 #include <AP_AccelCal/AP_AccelCal.h>                // interface and maths for accelerometer calibration
 #include <AP_Math/AP_Math.h>            // ArduPilot Mega Vector/Matrix math Library
 #include <AP_Declination/AP_Declination.h>     // ArduPilot Mega Declination Helper Library
@@ -47,7 +46,7 @@
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_Mission/AP_Mission.h>         // Mission command library
 #include <AC_AttitudeControl/AC_AttitudeControl_Sub.h> // Attitude control library
-#include <AC_AttitudeControl/AC_PosControl_Sub.h>      // Position control library
+#include <AC_AttitudeControl/AC_PosControl.h>      // Position control library
 #include <AP_Motors/AP_Motors.h>          // AP Motors library
 #include <Filter/Filter.h>             // Filter library
 #include <AP_Relay/AP_Relay.h>           // APM relay
@@ -57,10 +56,8 @@
 #include <AC_WPNav/AC_WPNav.h>           // Waypoint navigation library
 #include <AC_WPNav/AC_Loiter.h>
 #include <AC_WPNav/AC_Circle.h>          // circle navigation library
-#include <AC_Fence/AC_Fence.h>           // Fence library
 #include <AP_Scheduler/AP_Scheduler.h>       // main loop scheduler
 #include <AP_Scheduler/PerfInfo.h>       // loop perf monitoring
-#include <AP_Notify/AP_Notify.h>          // Notify library
 #include <AP_BattMonitor/AP_BattMonitor.h>     // Battery monitor library
 #include <AP_Terrain/AP_Terrain.h>
 #include <AP_JSButton/AP_JSButton.h>   // Joystick/gamepad button function assignment
@@ -166,7 +163,7 @@ private:
 
     // Optical flow sensor
 #if AP_OPTICALFLOW_ENABLED
-    OpticalFlow optflow;
+    AP_OpticalFlow optflow;
 #endif
 
     // system time in milliseconds of last recorded yaw reset from ekf
@@ -235,7 +232,6 @@ private:
 
     // sensor health for logging
     struct {
-        uint8_t baro        : 1;    // true if any single baro is healthy
         uint8_t depth       : 1;    // true if depth sensor is healthy
         uint8_t compass     : 1;    // true if compass is healthy
     } sensor_health;
@@ -331,7 +327,7 @@ private:
     // To-Do: move inertial nav up or other navigation variables down here
     AC_AttitudeControl_Sub attitude_control;
 
-    AC_PosControl_Sub pos_control;
+    AC_PosControl pos_control;
 
     AC_WPNav wp_nav;
     AC_Loiter loiter_nav;
@@ -345,11 +341,6 @@ private:
     // Camera/Antenna mount tracking and stabilisation stuff
 #if HAL_MOUNT_ENABLED
     AP_Mount camera_mount;
-#endif
-
-    // AC_Fence library to reduce fly-aways
-#if AC_FENCE == ENABLED
-    AC_Fence fence;
 #endif
 
 #if AVOIDANCE_ENABLED == ENABLED
@@ -386,7 +377,7 @@ private:
     static const AP_Param::Info var_info[];
     static const struct LogStructure log_structure[];
 
-    void fast_loop() override;
+    void run_rate_controller();
     void fifty_hz_loop();
     void update_batt_compass(void);
     void ten_hz_logging_loop();
@@ -404,7 +395,6 @@ private:
     float get_look_ahead_yaw();
     float get_pilot_desired_climb_rate(float throttle_control);
     float get_surface_tracking_climb_rate(int16_t target_rate, float current_alt_target, float dt);
-    void update_poscon_alt_max();
     void rotate_body_frame_to_NE(float &x, float &y);
     void Log_Write_Control_Tuning();
     void Log_Write_Attitude();
@@ -413,7 +403,6 @@ private:
     void Log_Write_Data(LogDataID id, int16_t value);
     void Log_Write_Data(LogDataID id, uint16_t value);
     void Log_Write_Data(LogDataID id, float value);
-    void Log_Sensor_Health();
     void Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_target, const Vector3f& vel_target);
     void Log_Write_Vehicle_Startup_Messages();
     void load_parameters(void) override;

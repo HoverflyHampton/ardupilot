@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 '''
 Drive Rover in SITL
 
@@ -72,6 +70,9 @@ class AutoTestRover(AutoTest):
     def default_frame(self):
         return "rover"
 
+    def default_speedup(self):
+        return 30
+
     def is_rover(self):
         return True
 
@@ -82,15 +83,17 @@ class AutoTestRover(AutoTest):
     #   TESTS DRIVE
     ##########################################################
     # Drive a square in manual mode
-    def drive_square(self, side=50):
-        """Drive a square, Driving N then E ."""
+    def DriveSquare(self, side=50):
+        """Learn/Drive Square with Ch7 option"""
 
         self.context_push()
         ex = None
         try:
             self.progress("TEST SQUARE")
-            self.set_parameter("RC7_OPTION", 7)
-            self.set_parameter("RC9_OPTION", 58)
+            self.set_parameters({
+                "RC7_OPTION": 7,
+                "RC9_OPTION": 58,
+            })
 
             self.change_mode('MANUAL')
 
@@ -232,7 +235,7 @@ class AutoTestRover(AutoTest):
     #         "timed out after %u seconds" % timeout)
     #         return False
 
-    def test_sprayer(self):
+    def Sprayer(self):
         """Test sprayer functionality."""
         self.context_push()
         ex = None
@@ -310,7 +313,7 @@ class AutoTestRover(AutoTest):
             self.change_mode("AUTO")
 #            self.send_debug_trap()
             self.progress("Waiting for sprayer to start")
-            self.wait_servo_channel_value(pump_ch, 1300, timeout=60, comparator=operator.gt)
+            self.wait_servo_channel_value(pump_ch, 1250, timeout=60, comparator=operator.gt)
             self.progress("Waiting for sprayer to stop")
             self.wait_servo_channel_value(pump_ch, pump_ch_min, timeout=120)
 
@@ -351,8 +354,8 @@ class AutoTestRover(AutoTest):
         if ex:
             raise ex
 
-    def drive_max_rcin(self, timeout=30):
-        """Test max RC inputs"""
+    def DriveMaxRCIN(self, timeout=30):
+        """Drive rover at max RC inputs"""
         self.context_push()
         ex = None
 
@@ -392,16 +395,21 @@ class AutoTestRover(AutoTest):
     def drive_mission(self, filename, strict=True):
         """Drive a mission from a file."""
         self.progress("Driving mission %s" % filename)
-        self.load_mission(filename, strict=strict)
+        wp_count = self.load_mission(filename, strict=strict)
         self.wait_ready_to_arm()
         self.arm_vehicle()
         self.change_mode('AUTO')
-        self.wait_waypoint(1, 4, max_dist=5)
+        self.wait_waypoint(1, wp_count-1, max_dist=5)
         self.wait_statustext("Mission Complete", timeout=600)
         self.disarm_vehicle()
         self.progress("Mission OK")
 
-    def test_gripper_mission(self):
+    def DriveMission(self):
+        '''Drive Mission rover1.txt'''
+        self.drive_mission("rover1.txt", strict=False)
+
+    def GripperMission(self):
+        '''Test Gripper Mission Items'''
         self.load_mission("rover-gripper-mission.txt")
         self.change_mode('AUTO')
         self.wait_ready_to_arm()
@@ -412,7 +420,8 @@ class AutoTestRover(AutoTest):
         self.wait_statustext("Mission Complete", timeout=60, check_context=True)
         self.disarm_vehicle()
 
-    def do_get_banner(self):
+    def GetBanner(self):
+        '''Get Banner'''
         target_sysid = self.sysid_thismav()
         target_compid = 1
         self.mav.mav.command_long_send(
@@ -441,15 +450,17 @@ class AutoTestRover(AutoTest):
         raise MsgRcvTimeoutException("banner not received")
 
     def drive_brake_get_stopping_distance(self, speed):
-        # measure our stopping distance:
-        old_cruise_speed = self.get_parameter('CRUISE_SPEED')
-        old_accel_max = self.get_parameter('ATC_ACCEL_MAX')
+        '''measure our stopping distance'''
+
+        self.context_push()
 
         # controller tends not to meet cruise speed (max of ~14 when 15
         # set), thus *1.2
-        self.set_parameter('CRUISE_SPEED', speed*1.2)
         # at time of writing, the vehicle is only capable of 10m/s/s accel
-        self.set_parameter('ATC_ACCEL_MAX', 15)
+        self.set_parameters({
+            'CRUISE_SPEED': speed*1.2,
+            'ATC_ACCEL_MAX': 15,
+        })
         self.change_mode("STEERING")
         self.set_rc(3, 2000)
         self.wait_groundspeed(15, 100)
@@ -471,17 +482,16 @@ class AutoTestRover(AutoTest):
                 break
         delta = self.get_distance(start, stop)
 
-        self.set_parameter('CRUISE_SPEED', old_cruise_speed)
-        self.set_parameter('ATC_ACCEL_MAX', old_accel_max)
+        self.context_pop()
 
         return delta
 
-    def drive_brake(self):
-        old_using_brake = self.get_parameter('ATC_BRAKE')
-        old_cruise_speed = self.get_parameter('CRUISE_SPEED')
-
-        self.set_parameter('CRUISE_SPEED', 15)
-        self.set_parameter('ATC_BRAKE', 0)
+    def DriveBrake(self):
+        '''Test braking'''
+        self.set_parameters({
+            'CRUISE_SPEED': 15,
+            'ATC_BRAKE': 0,
+        })
 
         self.arm_vehicle()
 
@@ -490,21 +500,18 @@ class AutoTestRover(AutoTest):
         # brakes on:
         self.set_parameter('ATC_BRAKE', 1)
         distance_with_brakes = self.drive_brake_get_stopping_distance(15)
-        # revert state:
-        self.set_parameter('ATC_BRAKE', old_using_brake)
-        self.set_parameter('CRUISE_SPEED', old_cruise_speed)
 
         delta = distance_without_brakes - distance_with_brakes
+
+        self.disarm_vehicle()
+
         if delta < distance_without_brakes * 0.05:  # 5% isn't asking for much
-            self.disarm_vehicle()
             raise NotAchievedException("""
 Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
 """ %
                                        (distance_with_brakes,
                                         distance_without_brakes,
                                         delta))
-
-        self.disarm_vehicle()
 
         self.progress(
             "Brakes work (with=%0.2fm without=%0.2fm delta=%0.2fm)" %
@@ -514,7 +521,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         '''maximum distance allowed from home at end'''
         return 6.5
 
-    def drive_rtl_mission(self, timeout=120):
+    def DriveRTL(self, timeout=120):
+        '''Drive an RTL Mission'''
         self.wait_ready_to_arm()
         self.arm_vehicle()
 
@@ -547,7 +555,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
                       (m.wp_dist, wp_dist_min,))
 
         # wait for mission to complete
-        self.wait_statustext("Mission Complete", timeout=60)
+        self.wait_statustext("Mission Complete", timeout=70)
 
         # the EKF doesn't pull us down to 0 speed:
         self.wait_groundspeed(0, 0.5, timeout=600)
@@ -564,14 +572,17 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.disarm_vehicle()
         self.progress("RTL Mission OK (%fm)" % home_distance)
 
-    def drive_fence_ac_avoidance(self):
+    def AC_Avoidance(self):
+        '''Test AC Avoidance switch'''
         self.context_push()
         ex = None
         try:
             self.load_fence("rover-fence-ac-avoid.txt")
-            self.set_parameter("FENCE_ENABLE", 0)
-            self.set_parameter("PRX_TYPE", 10)
-            self.set_parameter("RC10_OPTION", 40) # proximity-enable
+            self.set_parameters({
+                "FENCE_ENABLE": 0,
+                "PRX1_TYPE": 10,
+                "RC10_OPTION": 40, # proximity-enable
+            })
             self.reboot_sitl()
             # start = self.mav.location()
             self.wait_ready_to_arm()
@@ -600,7 +611,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex:
             raise ex
 
-    def test_servorelayevents(self):
+    def ServoRelayEvents(self):
+        '''Test ServoRelayEvents'''
         self.do_set_relay(0, 0)
         off = self.get_parameter("SIM_PIN_MASK")
         self.do_set_relay(0, 1)
@@ -610,7 +622,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
                 "Pin mask unchanged after relay cmd")
         self.progress("Pin mask changed after relay command")
 
-    def test_setting_modes_via_mavproxy_switch(self):
+    def MAVProxy_SetModeUsingSwitch(self):
+        """Set modes via mavproxy switch"""
         self.customise_SITL_commandline([
             "--rc-in-port", "5502",
         ])
@@ -641,7 +654,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex is not None:
             raise ex
 
-    def test_setting_modes_via_mavproxy_mode_command(self):
+    def MAVProxy_SetModeUsingMode(self):
+        '''Set modes via mavproxy mode command'''
         fnoo = [(1, 'ACRO'),
                 (3, 'STEERING'),
                 (4, 'HOLD'),
@@ -658,8 +672,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             self.wait_mode(expected)
         self.stop_mavproxy(mavproxy)
 
-    def test_setting_modes_via_modeswitch(self):
-        # test setting of modes through mode switch
+    def ModeSwitch(self):
+        ''''Set modes via modeswitch'''
         self.context_push()
         ex = None
         try:
@@ -686,7 +700,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex is not None:
             raise ex
 
-    def test_setting_modes_via_auxswitches(self):
+    def AuxModeSwitch(self):
+        '''Set modes via auxswitches'''
         self.context_push()
         ex = None
         try:
@@ -698,8 +713,10 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
 
             self.set_rc(9, 1000)
             self.set_rc(10, 1000)
-            self.set_parameter("RC9_OPTION", 53) # steering
-            self.set_parameter("RC10_OPTION", 54) # hold
+            self.set_parameters({
+                "RC9_OPTION": 53, # steering
+                "RC10_OPTION": 54, # hold
+            })
             self.set_rc(9, 1900)
             self.wait_mode("STEERING")
             self.set_rc(10, 1900)
@@ -727,7 +744,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex is not None:
             raise ex
 
-    def test_rc_override_cancel(self):
+    def RCOverridesCancel(self):
+        '''Test RC overrides Cancel'''
         self.set_parameter("SYSID_MYGCS", self.mav.source_system)
         self.change_mode('MANUAL')
         self.wait_ready_to_arm()
@@ -797,7 +815,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
                 break
         self.disarm_vehicle()
 
-    def test_rc_overrides(self):
+    def RCOverrides(self):
+        '''Test RC overrides'''
         self.context_push()
         self.set_parameter("SYSID_MYGCS", self.mav.source_system)
         ex = None
@@ -1040,7 +1059,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex is not None:
             raise ex
 
-    def test_manual_control(self):
+    def MANUAL_CONTROL(self):
+        '''Test mavlink MANUAL_CONTROL'''
         self.context_push()
         self.set_parameter("SYSID_MYGCS", self.mav.source_system)
         ex = None
@@ -1130,6 +1150,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             raise ex
 
     def CameraMission(self):
+        '''Test Camera Mission Items'''
         self.load_mission("rover-camera-mission.txt")
         self.wait_ready_to_arm()
         self.change_mode("AUTO")
@@ -1166,17 +1187,20 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
 
         self.disarm_vehicle()
 
-    def test_do_set_mode_via_command_long(self):
+    def DO_SET_MODE(self):
+        '''Set mode via MAV_COMMAND_DO_SET_MODE'''
         self.do_set_mode_via_command_long("HOLD")
         self.do_set_mode_via_command_long("MANUAL")
 
-    def test_mavproxy_do_set_mode_via_command_long(self):
+    def MAVProxy_DO_SET_MODE(self):
+        '''Set mode using MAVProxy commandline DO_SET_MODE'''
         mavproxy = self.start_mavproxy()
         self.mavproxy_do_set_mode_via_command_long(mavproxy, "HOLD")
         self.mavproxy_do_set_mode_via_command_long(mavproxy, "MANUAL")
         self.stop_mavproxy(mavproxy)
 
-    def test_sysid_enforce(self):
+    def SYSID_ENFORCE(self):
+        '''Test enforcement of SYSID_MYGCS'''
         '''Run the same arming code with correct then incorrect SYSID'''
 
         if self.mav.source_system != self.mav.mav.srcSystem:
@@ -1235,11 +1259,9 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex is not None:
             raise ex
 
-    def test_rally_points(self):
-        self.reboot_sitl() # to ensure starting point is as expected
-
+    def Rally(self):
+        '''Test Rally Points'''
         self.load_rally("rover-test-rally.txt")
-        accuracy = self.get_parameter("WP_RADIUS")
 
         self.wait_ready_to_arm()
         self.arm_vehicle()
@@ -1253,7 +1275,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
                                -105.229401,
                                0,
                                0)
-        self.wait_location(loc, accuracy=accuracy)
+        accuracy = self.get_parameter("WP_RADIUS")
+        self.wait_location(loc, accuracy=accuracy, minimum_duration=10)
         self.disarm_vehicle()
 
     def fence_with_bad_frame(self, target_system=1, target_component=1):
@@ -1982,7 +2005,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
 
 #        MANUAL> usage: fence <addcircle|addpoly|changealt|clear|disable|draw|enable|list|load|move|movemulti|movepolypoint|param|remove|save|savecsv|savelocal|show|status|undo|update>  # noqa
 
-    def test_gcs_fence(self):
+    def GCSFence(self):
+        '''Upload and download of fence'''
         target_system = 1
         target_component = 1
 
@@ -2152,8 +2176,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
     # exclusion zones)
     # FIXME: add test that a fence with edges that cross can't be uploaded
     # FIXME: add a test that fences enclose an area (e.g. all the points aren't the same value!
-
-    def test_offboard(self, timeout=90):
+    def Offboard(self, timeout=90):
+        '''Test Offboard Control'''
         self.load_mission("rover-guided-mission.txt")
         self.wait_ready_to_arm(require_absolute=True)
         self.arm_vehicle()
@@ -2387,7 +2411,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
 
     def click_three_in(self, mavproxy, target_system=1, target_component=1):
         mavproxy.send('rally clear\n')
-        self.drain_mav_unparsed()
+        self.drain_mav()
         # there are race conditions in MAVProxy.  Beware.
         mavproxy.send("click 1.0 1.0\n")
         mavproxy.send("rally add\n")
@@ -2406,8 +2430,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             mavutil.mavlink.MAV_MISSION_TYPE_RALLY,
         )
 
-    def test_gcs_rally(self, target_system=1, target_component=1):
-
+    def GCSRally(self, target_system=1, target_component=1):
+        '''Upload and download of rally using MAVProxy'''
         self.start_subtest("Testing mavproxy CLI for rally points")
         if not self.mavproxy_can_do_mision_item_protocols():
             return
@@ -2423,7 +2447,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         lat = float(lat_s)
         lng = float(lng_s)
         mavproxy.send('click %s %s\n' % (lat_s, lng_s))
-        self.drain_mav_unparsed()
+        self.drain_mav()
         mavproxy.send('rally add\n')
         self.assert_receive_mission_ack(mavutil.mavlink.MAV_MISSION_TYPE_RALLY,
                                         target_system=255,
@@ -2630,9 +2654,9 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.end_subsubtest("rally move")
 
         self.start_subsubtest("rally movemulti")
-        self.drain_mav_unparsed()
+        self.drain_mav()
         mavproxy.send('rally clear\n')
-        self.drain_mav_unparsed()
+        self.drain_mav()
         # there are race conditions in MAVProxy.  Beware.
         mavproxy.send("click 1.0 1.0\n")
         mavproxy.send("rally add\n")
@@ -2658,7 +2682,6 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         # MAVProxy currently sends three separate items up.  That's
         # not great and I don't want to lock that behaviour in here.
         self.delay_sim_time(10)
-        self.drain_mav_unparsed()
         expected_moved_items = copy.copy(unmoved_items)
         expected_moved_items[0].x = 1.0 * 1e7
         expected_moved_items[0].y = 2.0 * 1e7
@@ -2677,7 +2700,6 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         # MAVProxy currently sends three separate items up.  That's
         # not great and I don't want to lock that behaviour in here.
         self.delay_sim_time(10)
-        self.drain_mav_unparsed()
         expected_moved_items = copy.copy(unmoved_items)
         expected_moved_items[0].x = 3.0 * 1e7
         expected_moved_items[0].y = 1.0 * 1e7
@@ -2718,7 +2740,6 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.progress("Removing first in list")
         mavproxy.send("rally remove 1\n")
         self.delay_sim_time(5)
-        self.drain_mav_unparsed()
         self.assert_mission_count_on_link(
             self.mav,
             1,
@@ -2735,7 +2756,6 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.progress("Removing remaining item")
         mavproxy.send("rally remove 1\n")
         self.delay_sim_time(5)
-        self.drain_mav_unparsed()
         self.assert_mission_count_on_link(
             self.mav,
             0,
@@ -2777,7 +2797,6 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.progress("Removing first in list")
         mavproxy.send("rally remove 1\n")
         self.delay_sim_time(5)
-        self.drain_mav_unparsed()
         self.assert_mission_count_on_link(
             self.mav,
             2,
@@ -2797,10 +2816,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         mavproxy.send("rally move 1\n")
         # move has already been tested, assume it works...
         self.delay_sim_time(5)
-        self.drain_mav_unparsed()
         mavproxy.send("rally undo\n")
         self.delay_sim_time(5)
-        self.drain_mav_unparsed()
         undone_items = self.download_using_mission_protocol(mavutil.mavlink.MAV_MISSION_TYPE_RALLY)
         self.check_rally_items_same(pure_items, undone_items)
 
@@ -2847,8 +2864,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
 
 # MANUAL> usage: rally <add|alt|changealt|clear|list|load|move|movemulti|param|remove|save|savecsv|savelocal|show|status|undo|update>  # noqa
 
-    def test_rally(self, target_system=1, target_component=1):
-
+    def RallyUploadDownload(self, target_system=1, target_component=1):
+        '''Upload and download of rally'''
         old_srcSystem = self.mav.mav.srcSystem
 
         self.drain_mav()
@@ -3433,7 +3450,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             raise e
         self.reboot_sitl()
 
-    def test_gcs_mission(self):
+    def GCSMission(self):
         '''check MAVProxy's waypoint handling of missions'''
         target_system = 1
         target_component = 1
@@ -3442,7 +3459,6 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.delay_sim_time(1)
         if self.get_parameter("MIS_TOTAL") != 0:
             raise NotAchievedException("Failed to clear mission")
-        self.drain_mav_unparsed()
         m = self.assert_receive_message('MISSION_CURRENT', timeout=5)
         if m.seq != 0:
             raise NotAchievedException("Bad mission current")
@@ -3590,7 +3606,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             now = self.get_sim_time_cached()
             if now - tstart > timeout:
                 raise AutoTestTimeoutException("Did not get to location")
-            if now - last_sent > 1:
+            if now - last_sent > 10:
                 last_sent = now
                 self.mav.mav.set_position_target_global_int_send(
                     0,
@@ -3645,7 +3661,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             now = self.get_sim_time_cached()
             if now - tstart > timeout:
                 raise NotAchievedException("Did not breach boundary + RTL")
-            if now - last_sent > 1:
+            if now - last_sent > 10:
                 last_sent = now
                 self.mav.mav.set_position_target_global_int_send(
                     0,
@@ -3710,7 +3726,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             now = self.get_sim_time_cached()
             if now - tstart > timeout:
                 raise NotAchievedException("Did not arrive and stop at boundary")
-            if now - last_sent > 1:
+            if now - last_sent > 10:
                 last_sent = now
                 self.mav.mav.set_position_target_global_int_send(
                     0,
@@ -4347,7 +4363,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             raise NotAchievedException("Items did not survive reboot (want=%u got=%u)" %
                                        (8, downloaded_len))
 
-    def test_poly_fence(self):
+    def PolyFence(self):
         '''test fence-related functions'''
         target_system = 1
         target_component = 1
@@ -4356,8 +4372,10 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.wait_ready_to_arm()
         here = self.mav.location()
         self.progress("here: %f %f" % (here.lat, here.lng))
-        self.set_parameter("FENCE_ENABLE", 1)
-        self.set_parameter("AVOID_ENABLE", 0)
+        self.set_parameters({
+            "FENCE_ENABLE": 1,
+            "AVOID_ENABLE": 0,
+        })
 
 #        self.set_parameter("SIM_SPEEDUP", 1)
 
@@ -4535,7 +4553,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
                                                      target_system=target_system,
                                                      target_component=target_component)
 
-    def drive_smartrtl(self):
+    def SmartRTL(self):
+        '''Test SmartRTL'''
         self.change_mode("STEERING")
         self.wait_ready_to_arm()
         self.arm_vehicle()
@@ -4559,15 +4578,15 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.change_mode("SMART_RTL")
 
         self.progress("Ensure we go via intermediate point")
-        self.wait_distance_to_location(loc, 0, 5)
+        self.wait_distance_to_location(loc, 0, 5, timeout=60)
 
         self.progress("Ensure we get home")
         self.wait_distance_to_home(3, 7, timeout=30)
 
         self.disarm_vehicle()
 
-    def test_motor_test(self):
-        '''AKA run-rover-run'''
+    def MotorTest(self):
+        '''Motor Test triggered via mavlink'''
         magic_throttle_value = 1812
         self.wait_ready_to_arm()
         self.run_cmd(
@@ -4605,9 +4624,11 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.context_push()
         ex = None
         try:
-            self.set_parameter("AVOID_ENABLE", 3)
-            self.set_parameter("OA_TYPE", 2)
-            self.set_parameter("FENCE_MARGIN", 0) # FIXME: https://github.com/ArduPilot/ardupilot/issues/11601
+            self.set_parameters({
+                "AVOID_ENABLE": 3,
+                "OA_TYPE": 2,
+                "FENCE_MARGIN": 0, # FIXME: https://github.com/ArduPilot/ardupilot/issues/11601
+            })
             self.reboot_sitl()
             self.change_mode('AUTO')
             self.wait_ready_to_arm()
@@ -4652,9 +4673,11 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.context_push()
         ex = None
         try:
-            self.set_parameter("AVOID_ENABLE", 3)
-            self.set_parameter("OA_TYPE", 2)
-            self.set_parameter("FENCE_MARGIN", 0) # FIXME: https://github.com/ArduPilot/ardupilot/issues/11601
+            self.set_parameters({
+                "AVOID_ENABLE": 3,
+                "OA_TYPE": 2,
+                "FENCE_MARGIN": 0, # FIXME: https://github.com/ArduPilot/ardupilot/issues/11601
+            })
             self.reboot_sitl()
             self.change_mode('GUIDED')
             self.wait_ready_to_arm()
@@ -4677,13 +4700,15 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex is not None:
             raise ex
 
-    def test_wheelencoders(self):
+    def WheelEncoders(self):
         '''make sure wheel encoders are generally working'''
         ex = None
         try:
-            self.set_parameter("WENC_TYPE", 10)
-            self.set_parameter("EK3_ENABLE", 1)
-            self.set_parameter("AHRS_EKF_TYPE", 3)
+            self.set_parameters({
+                "WENC_TYPE": 10,
+                "EK3_ENABLE": 1,
+                "AHRS_EKF_TYPE": 3,
+            })
             self.reboot_sitl()
             self.change_mode("LOITER")
             self.wait_ready_to_arm()
@@ -4737,8 +4762,10 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.context_push()
         ex = None
         try:
-            self.set_parameter("AVOID_ENABLE", 3)
-            self.set_parameter("OA_TYPE", 2)
+            self.set_parameters({
+                "AVOID_ENABLE": 3,
+                "OA_TYPE": 2,
+            })
             self.reboot_sitl()
             self.change_mode('GUIDED')
             self.wait_ready_to_arm()
@@ -4786,8 +4813,10 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             ])
         if self.mavproxy is not None:
             self.mavproxy.send("fence list\n")
-        self.set_parameter("FENCE_ENABLE", 1)
-        self.set_parameter("AVOID_ENABLE", 3)
+        self.set_parameters({
+            "FENCE_ENABLE": 1,
+            "AVOID_ENABLE": 3,
+        })
         fence_middle = self.offset_location_ne(here, 0, 30)
         # FIXME: this might be nowhere near "here"!
         expected_stopping_point = mavutil.location(40.0713376, -105.2295738, 0, 0)
@@ -4804,7 +4833,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.change_mode("RTL")
         self.wait_distance_to_home(distance_min, distance_max, timeout=timeout)
 
-    def test_poly_fence_avoidance(self, target_system=1, target_component=1):
+    def PolyFenceAvoidance(self, target_system=1, target_component=1):
+        '''PolyFence avoidance tests'''
         self.change_mode("LOITER")
         self.wait_ready_to_arm()
         self.arm_vehicle()
@@ -4823,15 +4853,19 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.context_push()
         ex = None
         try:
-            self.set_parameter("AVOID_ENABLE", 3)
-            self.set_parameter("OA_TYPE", 1)
-            self.set_parameter("OA_LOOKAHEAD", 50)
+            self.set_parameters({
+                "AVOID_ENABLE": 3,
+                "OA_TYPE": 1,
+                "OA_LOOKAHEAD": 50,
+            })
             self.reboot_sitl()
             self.change_mode('GUIDED')
             self.wait_ready_to_arm()
             self.arm_vehicle()
-            self.set_parameter("FENCE_ENABLE", 1)
-            self.set_parameter("WP_RADIUS", 5)
+            self.set_parameters({
+                "FENCE_ENABLE": 1,
+                "WP_RADIUS": 5,
+            })
             if self.mavproxy is not None:
                 self.mavproxy.send("fence list\n")
             target_loc = mavutil.location(40.071060, -105.227734, 0, 0)
@@ -4851,7 +4885,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex is not None:
             raise ex
 
-    def test_poly_fence_object_avoidance_bendy_ruler_easier(self, target_system=1, target_component=1):
+    def PolyFenceObjectAvoidanceBendyRulerEasier(self, target_system=1, target_component=1):
+        '''PolyFence object avoidance tests - easier bendy ruler test'''
         if not self.mavproxy_can_do_mision_item_protocols():
             return
         self.test_poly_fence_object_avoidance_auto_bendy_ruler_easier(
@@ -4870,15 +4905,19 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.context_push()
         ex = None
         try:
-            self.set_parameter("AVOID_ENABLE", 3)
-            self.set_parameter("OA_TYPE", 1)
-            self.set_parameter("OA_LOOKAHEAD", 50)
+            self.set_parameters({
+                "AVOID_ENABLE": 3,
+                "OA_TYPE": 1,
+                "OA_LOOKAHEAD": 50,
+            })
             self.reboot_sitl()
             self.change_mode('GUIDED')
             self.wait_ready_to_arm()
             self.arm_vehicle()
-            self.set_parameter("FENCE_ENABLE", 1)
-            self.set_parameter("WP_RADIUS", 5)
+            self.set_parameters({
+                "FENCE_ENABLE": 1,
+                "WP_RADIUS": 5,
+            })
             if self.mavproxy is not None:
                 self.mavproxy.send("fence list\n")
             target_loc = mavutil.location(40.071260, -105.227000, 0, 0)
@@ -4911,15 +4950,19 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.context_push()
         ex = None
         try:
-            self.set_parameter("AVOID_ENABLE", 3)
-            self.set_parameter("OA_TYPE", 1)
-            self.set_parameter("OA_LOOKAHEAD", 50)
+            self.set_parameters({
+                "AVOID_ENABLE": 3,
+                "OA_TYPE": 1,
+                "OA_LOOKAHEAD": 50,
+            })
             self.reboot_sitl()
             self.change_mode('AUTO')
             self.wait_ready_to_arm()
             self.arm_vehicle()
-            self.set_parameter("FENCE_ENABLE", 1)
-            self.set_parameter("WP_RADIUS", 5)
+            self.set_parameters({
+                "FENCE_ENABLE": 1,
+                "WP_RADIUS": 5,
+            })
             if self.mavproxy is not None:
                 self.mavproxy.send("fence list\n")
             target_loc = mavutil.location(40.071260, -105.227000, 0, 0)
@@ -4937,7 +4980,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex is not None:
             raise ex
 
-    def test_poly_fence_object_avoidance(self, target_system=1, target_component=1):
+    def PolyFenceObjectAvoidance(self, target_system=1, target_component=1):
+        '''PolyFence object avoidance tests'''
         if not self.mavproxy_can_do_mision_item_protocols():
             return
 
@@ -4948,7 +4992,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             target_system=target_system,
             target_component=target_component)
 
-    def test_poly_fence_object_avoidance_bendy_ruler(self, target_system=1, target_component=1):
+    def PolyFenceObjectAvoidanceBendyRuler(self, target_system=1, target_component=1):
+        '''PolyFence object avoidance tests - bendy ruler'''
         if not self.mavproxy_can_do_mision_item_protocols():
             return
         # bendy Ruler isn't as flexible as Dijkstra for planning, so
@@ -5008,9 +5053,11 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             messages.append(message)
         self.install_message_hook(my_message_hook)
         try:
-            self.set_parameter("SCR_ENABLE", 1)
-            self.set_parameter("SCR_HEAP_SIZE", 1024000)
-            self.set_parameter("SCR_VM_I_COUNT", 1000000)
+            self.set_parameters({
+                "SCR_ENABLE": 1,
+                "SCR_HEAP_SIZE": 1024000,
+                "SCR_VM_I_COUNT": 1000000,
+            })
 
             for script in test_scripts:
                 self.install_test_script(script)
@@ -5066,7 +5113,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex is not None:
             raise ex
 
-    def test_scripting_steering_and_throttle(self):
+    def ScriptingSteeringAndThrottle(self):
+        '''Scripting test - steering and throttle'''
         self.start_subtest("Scripting square")
         ex = None
         example_script = "rover-set-steering-and-throttle.lua"
@@ -5177,7 +5225,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex is not None:
             raise ex
 
-    def test_scripting(self):
+    def Scripting(self):
+        '''Scripting test'''
         self.test_scripting_set_home_to_vehicle_location()
         self.test_scripting_print_home_and_origin()
         self.test_scripting_hello_world()
@@ -5227,7 +5276,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
 
         self.check_mission_upload_download(items)
 
-    def test_mission_frames(self, target_system=1, target_component=1):
+    def MissionFrames(self, target_system=1, target_component=1):
+        '''Upload/Download of items in different frames'''
         for frame in (mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT_INT,
                       mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT,
                       mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
@@ -5310,13 +5360,16 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
                 self.progress("Have now seen all expected messages")
                 break
 
-    def ap_proximity_mav(self):
+    def AP_Proximity_MAV(self):
+        '''Test MAV proximity backend'''
         self.context_push()
         ex = None
         try:
-            self.set_parameter("PRX_TYPE", 2)  # AP_Proximity_MAV
-            self.set_parameter("OA_TYPE", 2)  # dijkstra
-            self.set_parameter("OA_DB_OUTPUT", 3)  # send all items
+            self.set_parameters({
+                "PRX1_TYPE": 2,  # AP_Proximity_MAV
+                "OA_TYPE": 2,  # dijkstra
+                "OA_DB_OUTPUT": 3,  # send all items
+            })
             self.reboot_sitl()
 
             # 1 laser pointing straight forward:
@@ -5369,7 +5422,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex is not None:
             raise ex
 
-    def test_send_to_components(self):
+    def SendToComponents(self):
+        '''Test ArduPilot send_to_components function'''
         self.progress("Introducing ourselves to the autopilot as a component")
         old_srcSystem = self.mav.mav.srcSystem
         self.mav.mav.srcSystem = 1
@@ -5410,7 +5464,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
                 raise NotAchievedException("Did not get correct command_id")
             break
 
-    def test_skid_steer(self):
+    def SkidSteer(self):
+        '''Check skid-steering'''
         model = "rover-skid"
 
         self.customise_SITL_commandline([],
@@ -5439,7 +5494,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.zero_throttle()
         self.disarm_vehicle()
 
-    def test_slew_rate(self):
+    def SlewRate(self):
         """Test Motor Slew Rate feature."""
         self.context_push()
         self.change_mode("MANUAL")
@@ -5516,6 +5571,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.context_pop()
 
     def SET_ATTITUDE_TARGET(self, target_sysid=None, target_compid=1):
+        '''Test handling of SET_ATTITUDE_TARGET'''
         if target_sysid is None:
             target_sysid = self.sysid_thismav()
         self.change_mode('GUIDED')
@@ -5549,6 +5605,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.disarm_vehicle()
 
     def SET_POSITION_TARGET_LOCAL_NED(self, target_sysid=None, target_compid=1):
+        '''Test handling of SET_POSITION_TARGET_LOCAL_NED'''
         if target_sysid is None:
             target_sysid = self.sysid_thismav()
         self.change_mode('GUIDED')
@@ -5596,7 +5653,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.do_RTL()
         self.disarm_vehicle()
 
-    def test_end_mission_behavior(self, timeout=60):
+    def EndMissionBehavior(self, timeout=60):
+        '''Test end mission behavior'''
         self.context_push()
         ex = None
         try:
@@ -5642,16 +5700,23 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
                     if self.get_sim_time_cached() - tstart > 15:
                         self.progress("Got POSITION_TARGET_GLOBAL_INT, all good !")
                         break
-            self.change_mode("GUIDED")
 
             self.start_subtest("Test End Mission Behavior ACRO")
             self.set_parameter("MIS_DONE_BEHAVE", 2)
-            self.change_mode("AUTO")
+            # race conditions here to do with get_sim_time()
+            # swallowing heartbeats means we have to be a little
+            # circuitous when testing here:
+            self.change_mode("GUIDED")
+            self.send_cmd_do_set_mode('AUTO')
             self.wait_mode("ACRO")
 
             self.start_subtest("Test End Mission Behavior MANUAL")
             self.set_parameter("MIS_DONE_BEHAVE", 3)
-            self.change_mode("AUTO")
+            # race conditions here to do with get_sim_time()
+            # swallowing heartbeats means we have to be a little
+            # circuitous when testing here:
+            self.change_mode("GUIDED")
+            self.send_cmd_do_set_mode("AUTO")
             self.wait_mode("MANUAL")
             self.disarm_vehicle()
         except Exception as e:
@@ -5662,7 +5727,8 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         if ex is not None:
             raise ex
 
-    def test_mavproxy_param(self):
+    def MAVProxyParam(self):
+        '''Test MAVProxy parameter handling'''
         mavproxy = self.start_mavproxy()
         mavproxy.send("param fetch\n")
         mavproxy.expect("Received [0-9]+ parameters")
@@ -5721,6 +5787,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         ])
 
     def MAV_CMD_DO_SET_MISSION_CURRENT(self, target_sysid=None, target_compid=1):
+        '''Test handling of CMD_DO_SET_MISSION_CURRENT'''
         if target_sysid is None:
             target_sysid = self.sysid_thismav()
         self.check_mission_upload_download(self.MAV_CMD_DO_SET_MISSION_CURRENT_mission())
@@ -5743,6 +5810,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
                      want_result=mavutil.mavlink.MAV_RESULT_FAILED)
 
     def FlashStorage(self):
+        '''Test flash storage (for parameters etc)'''
         self.set_parameter("LOG_BITMASK", 1)
         self.reboot_sitl()
 
@@ -5764,6 +5832,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.assert_parameter_value("LOG_BITMASK", 1)
 
     def FRAMStorage(self):
+        '''Test FRAM storage (for parameters etc)'''
         self.set_parameter("LOG_BITMASK", 1)
         self.reboot_sitl()
 
@@ -5785,7 +5854,32 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         # make sure we're back at our original value:
         self.assert_parameter_value("LOG_BITMASK", 1)
 
-    def test_depthfinder(self):
+    def RangeFinder(self):
+        '''Test RangeFinder'''
+        # the following magic numbers correspond to the post locations in SITL
+        home_string = "%s,%s,%s,%s" % (51.8752066, 14.6487840, 54.15, 315)
+
+        rangefinder_params = {
+            "SIM_SONAR_ROT": 6,
+        }
+        rangefinder_params.update(self.analog_rangefinder_parameters())
+
+        self.set_parameters(rangefinder_params)
+        self.customise_SITL_commandline([
+            "--home", home_string,
+        ])
+        self.wait_ready_to_arm()
+        if self.mavproxy is not None:
+            self.mavproxy.send('script /tmp/post-locations.scr\n')
+        m = self.assert_receive_message('RANGEFINDER', very_verbose=True)
+        if m.voltage == 0:
+            raise NotAchievedException("Did not get non-zero voltage")
+        want_range = 10
+        if abs(m.distance - want_range) > 0.1:
+            raise NotAchievedException("Expected %fm got %fm" % (want_range, m.distance))
+
+    def DepthFinder(self):
+        '''Test mulitple depthfinders for boats'''
         # Setup rangefinders
         self.customise_SITL_commandline([
             "--uartH=sim:nmea", # NMEA Rangefinder
@@ -5859,6 +5953,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         # self.context_pop()
 
     def EStopAtBoot(self):
+        '''Ensure EStop prevents arming when asserted at boot time'''
         self.context_push()
         self.set_parameters({
             "RC9_OPTION": 31,
@@ -5868,249 +5963,173 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.delay_sim_time(10)
         self.assert_prearm_failure("Motors Emergency Stopped")
         self.context_pop()
+        self.reboot_sitl()
+
+    def assert_mode(self, mode):
+        if not self.mode_is(mode):
+            raise NotAchievedException("Mode is not %s" % str(mode))
+
+    def ChangeModeByNumber(self):
+        '''ensure we can set a mode by number, handy when we don't have a
+        pymavlink number for it yet'''
+        for (x, want) in (0, 'MANUAL'), (1, 'ACRO'), (3, 3):
+            self.change_mode(x)
+            self.assert_mode(want)
+
+    def StickMixingAuto(self):
+        '''Ensure Stick Mixing works in auto'''
+        items = []
+        self.set_parameter('STICK_MIXING', 1)
+        # home
+        items.append((mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, 0, 0),)
+        # 1 waypoint a long way away
+        items.append((mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 2000, 0, 0),)
+        self.upload_simple_relhome_mission(items)
+        if self.mavproxy is not None:
+            # handy for getting pretty pictures
+            self.mavproxy.send("wp list\n")
+        self.change_mode('AUTO')
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+        self.set_rc(1, 1150)
+        self.wait_heading(45)
+        self.wait_heading(90)
+        self.disarm_vehicle()
+
+    def AutoDock(self):
+        '''Test automatic docking of rover for multiple FOVs of simulated beacon'''
+        self.context_push()
+
+        self.set_parameters({
+            "PLND_ENABLED": 1,
+            "PLND_TYPE": 4,
+            "PLND_ORIENT": 0,
+        })
+
+        start = self.mav.location()
+        target = start
+        (target.lat, target.lng) = mavextra.gps_offset(start.lat, start.lng, 4, -4)
+        self.progress("Setting target to %f %f" % (start.lat, start.lng))
+        stopping_dist = 0.5
+
+        self.set_parameters({
+            "SIM_PLD_ENABLE": 1,
+            "SIM_PLD_LAT": target.lat,
+            "SIM_PLD_LON": target.lng,
+            "SIM_PLD_HEIGHT": 0,
+            "SIM_PLD_ALT_LMT": 30,
+            "SIM_PLD_DIST_LMT": 30,
+            "SIM_PLD_ORIENT": 4,    # emit beams towards south, vehicle's heading must be north to see it
+            "SIM_PLD_OPTIONS": 1,
+            "DOCK_SPEED": 2,
+            "DOCK_STOP_DIST": stopping_dist,
+        })
+
+        for type in range(0, 3):  # CYLINDRICAL FOV, CONICAL FOV, SPHERICAL FOV
+            ex = None
+            try:
+                self.set_parameter("SIM_PLD_TYPE", type)
+                self.reboot_sitl()
+                self.wait_ready_to_arm()
+                self.arm_vehicle()
+                self.reach_heading_manual(0)
+                self.set_rc(3, 1400)
+                self.wait_distance(25)
+                self.set_rc_default()
+                self.change_mode(8) # DOCK mode
+                self.wait_groundspeed(0, 0.03, timeout=120)
+                self.disarm_vehicle()
+                self.assert_receive_message('GLOBAL_POSITION_INT')
+                new_pos = self.mav.location()
+                delta = abs(self.get_distance(target, new_pos) - stopping_dist)
+                self.progress("Docked %f metres from stopping point" % delta)
+                max_delta = 0.5
+                if delta > max_delta:
+                    raise NotAchievedException("Did not dock close enough to stopping point (%fm > %fm" % (delta, max_delta))
+
+                if not self.current_onboard_log_contains_message("PL"):
+                    raise NotAchievedException("Did not see expected PL message")
+
+            except Exception as e:
+                self.print_exception_caught(e)
+                ex = e
+                break
+        self.context_pop()
+        self.reboot_sitl()
+        self.progress("All done")
+
+        if ex is not None:
+            raise ex
 
     def tests(self):
         '''return list of all tests'''
         ret = super(AutoTestRover, self).tests()
 
         ret.extend([
-            ("MAVProxy_SetModeUsingSwitch",
-             "Set modes via mavproxy switch",
-             self.test_setting_modes_via_mavproxy_switch),
-
-            ("HIGH_LATENCY2",
-             "Set sending of HIGH_LATENCY2",
-             self.HIGH_LATENCY2),
-
-            ("MAVProxy_SetModeUsingMode",
-             "Set modes via mavproxy mode command",
-             self.test_setting_modes_via_mavproxy_mode_command),
-
-            ("ModeSwitch",
-             "Set modes via modeswitch",
-             self.test_setting_modes_via_modeswitch),
-
-            ("AuxModeSwitch",
-             "Set modes via auxswitches",
-             self.test_setting_modes_via_auxswitches),
-
-            ("DriveRTL",
-             "Drive an RTL Mission", self.drive_rtl_mission),
-
-            ("SmartRTL",
-             "Test SmartRTL",
-             self.drive_smartrtl),
-
-            ("DriveSquare",
-             "Learn/Drive Square with Ch7 option",
-             self.drive_square),
-
-            ("DriveMaxRCIN",
-             "Drive rover at max RC inputs",
-             self.drive_max_rcin),
-
-            ("DriveMission",
-             "Drive Mission %s" % "rover1.txt",
-             lambda: self.drive_mission("rover1.txt", strict=False)),
-
-            # disabled due to frequent failures in travis. This test needs re-writing
-            # ("Drive Brake", self.drive_brake),
-
-            ("GetBanner", "Get Banner", self.do_get_banner),
-
-            ("DO_SET_MODE",
-             "Set mode via MAV_COMMAND_DO_SET_MODE",
-             self.test_do_set_mode_via_command_long),
-
-            ("MAVProxy_DO_SET_MODE",
-             "Set mode via MAV_COMMAND_DO_SET_MODE with MAVProxy",
-             self.test_mavproxy_do_set_mode_via_command_long),
-
-            ("ServoRelayEvents",
-             "Test ServoRelayEvents",
-             self.test_servorelayevents),
-
-            ("RCOverrides", "Test RC overrides", self.test_rc_overrides),
-
-            ("RCOverridesCancel", "Test RC overrides Cancel", self.test_rc_override_cancel),
-
-            ("MANUAL_CONTROL", "Test mavlink MANUAL_CONTROL", self.test_manual_control),
-
-            ("Sprayer", "Test Sprayer", self.test_sprayer),
-
-            ("AC_Avoidance",
-             "Test AC Avoidance switch",
-             self.drive_fence_ac_avoidance),
-
-            ("CameraMission",
-             "Test Camera Mission Items",
-             self.CameraMission),
-
-            # Gripper test
-            ("Gripper",
-             "Test gripper",
-             self.test_gripper),
-
-            ("GripperMission",
-             "Test Gripper Mission Items",
-             self.test_gripper_mission),
-
-            ("SET_MESSAGE_INTERVAL",
-             "Test MAV_CMD_SET_MESSAGE_INTERVAL",
-             self.test_set_message_interval),
-
-            ("REQUEST_MESSAGE",
-             "Test MAV_CMD_REQUEST_MESSAGE",
-             self.test_request_message),
-
-            ("SYSID_ENFORCE",
-             "Test enforcement of SYSID_MYGCS",
-             self.test_sysid_enforce),
-
-            ("SET_ATTITUDE_TARGET",
-             "Test handling of SET_ATTITUDE_TARGET",
-             self.SET_ATTITUDE_TARGET),
-
-            ("SET_POSITION_TARGET_LOCAL_NED",
-             "Test handling of SET_POSITION_TARGET_LOCAL_NED",
-             self.SET_POSITION_TARGET_LOCAL_NED),
-
-            ("MAV_CMD_DO_SET_MISSION_CURRENT",
-             "Test handling of CMD_DO_SET_MISSION_CURRENT",
-             self.MAV_CMD_DO_SET_MISSION_CURRENT),
-
-            ("Button",
-             "Test Buttons",
-             self.test_button),
-
-            ("Rally",
-             "Test Rally Points",
-             self.test_rally_points),
-
-            ("Offboard",
-             "Test Offboard Control",
-             self.test_offboard),
-
-            ("MAVProxyParam",
-             "Test MAVProxy parameter handling",
-             self.test_mavproxy_param),
-
-            ("GCSFence",
-             "Upload and download of fence",
-             self.test_gcs_fence),
-
-            ("Rally",
-             "Upload and download of rally",
-             self.test_rally),
-
-            ("GCSMission",
-             "Upload and download of mission",
-             self.test_gcs_mission),
-
-            ("GCSRally",
-             "Upload and download of rally using MAVProxy",
-             self.test_gcs_rally),
-
-            ("MotorTest",
-             "Motor Test triggered via mavlink",
-             self.test_motor_test),
-
-            ("WheelEncoders",
-             "Ensure SITL wheel encoders work",
-             self.test_wheelencoders),
-
-            ("DataFlashOverMAVLink",
-             "Test DataFlash over MAVLink",
-             self.test_dataflash_over_mavlink),
-
-            ("DataFlashSITL",
-             "Test DataFlash SITL backend",
-             self.test_dataflash_sitl),
-
-            ("SkidSteer",
-             "Check skid-steering",
-             self.test_skid_steer),
-
-            ("PolyFence",
-             "PolyFence tests",
-             self.test_poly_fence),
-
-            ("PolyFenceAvoidance",
-             "PolyFence avoidance tests",
-             self.test_poly_fence_avoidance),
-
-            ("PolyFenceObjectAvoidance",
-             "PolyFence object avoidance tests",
-             self.test_poly_fence_object_avoidance),
-
-            ("PolyFenceObjectAvoidanceBendyRuler",
-             "PolyFence object avoidance tests - bendy ruler",
-             self.test_poly_fence_object_avoidance_bendy_ruler),
-
-            ("SendToComponents",
-             "Test ArduPilot send_to_components function",
-             self.test_send_to_components),
-
-            ("PolyFenceObjectAvoidanceBendyRulerEasier",
-             "PolyFence object avoidance tests - easier bendy ruler test",
-             self.test_poly_fence_object_avoidance_bendy_ruler_easier),
-
-            ("SlewRate",
-             "Test output slew rate",
-             self.test_slew_rate),
-
-            ("Scripting",
-             "Scripting test",
-             self.test_scripting),
-
-            ("ScriptingSteeringAndThrottle",
-             "Scripting test - steering and throttle",
-             self.test_scripting_steering_and_throttle),
-
-            ("MissionFrames",
-             "Upload/Download of items in different frames",
-             self.test_mission_frames),
-
-            ("SetpointGlobalPos",
-             "Test setpoint global position",
-             lambda: self.test_set_position_global_int()),
-
-            ("SetpointGlobalVel",
-             "Test setpoint gloabl velocity",
-             lambda: self.test_set_velocity_global_int()),
-
-            ("AccelCal",
-             "Accelerometer Calibration testing",
-             self.accelcal),
-
-            ("AP_Proximity_MAV",
-             "Test MAV proximity backend",
-             self.ap_proximity_mav),
-
-            ("EndMissionBehavior",
-             "Test end mission behavior",
-             self.test_end_mission_behavior),
-
-            ("FlashStorage",
-             "Test flash storage (for parameters etc)",
-             self.FlashStorage),
-
-            ("FRAMStorage",
-             "Test FRAM storage (for parameters etc)",
-             self.FRAMStorage),
-
-            ("LogUpload",
-             "Upload logs",
-             self.log_upload),
-
-            ("DepthFinder",
-             "Test mulitple depthfinders for boats",
-             self.test_depthfinder),
-
-            ("EStopAtBoot",
-             "Ensure EStop prevents arming when asserted at boot time",
-             self.EStopAtBoot),
-
+            self.MAVProxy_SetModeUsingSwitch,
+            self.HIGH_LATENCY2,
+            self.MAVProxy_SetModeUsingMode,
+            self.ModeSwitch,
+            self.AuxModeSwitch,
+            self.DriveRTL,
+            self.SmartRTL,
+            self.DriveSquare,
+            self.DriveMaxRCIN,
+            self.DriveMission,
+            # self.DriveBrake,  # disabled due to frequent failures
+            self.GetBanner,
+            self.DO_SET_MODE,
+            self.MAVProxy_DO_SET_MODE,
+            self.ServoRelayEvents,
+            self.RCOverrides,
+            self.RCOverridesCancel,
+            self.MANUAL_CONTROL,
+            self.Sprayer,
+            self.AC_Avoidance,
+            self.CameraMission,
+            self.Gripper,
+            self.GripperMission,
+            self.SET_MESSAGE_INTERVAL,
+            self.REQUEST_MESSAGE,
+            self.SYSID_ENFORCE,
+            self.SET_ATTITUDE_TARGET,
+            self.SET_POSITION_TARGET_LOCAL_NED,
+            self.MAV_CMD_DO_SET_MISSION_CURRENT,
+            self.Button,
+            self.Rally,
+            self.Offboard,
+            self.MAVProxyParam,
+            self.GCSFence,
+            self.GCSMission,
+            self.GCSRally,
+            self.MotorTest,
+            self.WheelEncoders,
+            self.DataFlashOverMAVLink,
+            self.DataFlash,
+            self.SkidSteer,
+            self.PolyFence,
+            self.PolyFenceAvoidance,
+            self.PolyFenceObjectAvoidance,
+            self.PolyFenceObjectAvoidanceBendyRuler,
+            self.SendToComponents,
+            self.PolyFenceObjectAvoidanceBendyRulerEasier,
+            self.SlewRate,
+            self.Scripting,
+            self.ScriptingSteeringAndThrottle,
+            self.MissionFrames,
+            self.SetpointGlobalPos,
+            self.SetpointGlobalVel,
+            self.AccelCal,
+            self.RangeFinder,
+            self.AP_Proximity_MAV,
+            self.EndMissionBehavior,
+            self.FlashStorage,
+            self.FRAMStorage,
+            self.DepthFinder,
+            self.ChangeModeByNumber,
+            self.EStopAtBoot,
+            self.StickMixingAuto,
+            self.AutoDock,
         ])
         return ret
 

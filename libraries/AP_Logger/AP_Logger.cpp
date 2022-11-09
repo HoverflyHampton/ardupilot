@@ -12,6 +12,7 @@
 #include <AP_InternalError/AP_InternalError.h>
 #include <GCS_MAVLink/GCS.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
+#include <AP_Rally/AP_Rally.h>
 
 AP_Logger *AP_Logger::_singleton;
 
@@ -63,6 +64,14 @@ extern const AP_HAL::HAL& hal;
 #  define HAL_LOGGING_BACKENDS_DEFAULT 0
 # endif
 #endif
+
+// when adding new msgs we start at a different index in replay
+#if APM_BUILD_TYPE(APM_BUILD_Replay)
+#define LOGGING_FIRST_DYNAMIC_MSGID REPLAY_LOG_NEW_MSG_MAX
+#else
+#define LOGGING_FIRST_DYNAMIC_MSGID 254
+#endif
+
 
 const AP_Param::GroupInfo AP_Logger::var_info[] = {
     // @Param: _BACKEND_TYPE
@@ -128,6 +137,7 @@ const AP_Param::GroupInfo AP_Logger::var_info[] = {
     // @Description: This sets the maximum rate that streaming log messages will be logged to the file backend. A value of zero means that rate limiting is disabled.
     // @Units: Hz
     // @Range: 0 1000
+    // @Increment: 0.1
     // @User: Standard
     AP_GROUPINFO("_FILE_RATEMAX",  8, AP_Logger, _params.file_ratemax, 0),
 
@@ -137,6 +147,7 @@ const AP_Param::GroupInfo AP_Logger::var_info[] = {
     // @Description: This sets the maximum rate that streaming log messages will be logged to the mavlink backend. A value of zero means that rate limiting is disabled.
     // @Units: Hz
     // @Range: 0 1000
+    // @Increment: 0.1
     // @User: Standard
     AP_GROUPINFO("_MAV_RATEMAX",  9, AP_Logger, _params.mav_ratemax, 0),
 #endif
@@ -147,6 +158,7 @@ const AP_Param::GroupInfo AP_Logger::var_info[] = {
     // @Description: This sets the maximum rate that streaming log messages will be logged to the mavlink backend. A value of zero means that rate limiting is disabled.
     // @Units: Hz
     // @Range: 0 1000
+    // @Increment: 0.1
     // @User: Standard
     AP_GROUPINFO("_BLK_RATEMAX", 10, AP_Logger, _params.blk_ratemax, 0),
 #endif
@@ -856,7 +868,7 @@ void AP_Logger::Write_Mode(uint8_t mode, const ModeReason reason)
 
 void AP_Logger::Write_Parameter(const char *name, float value)
 {
-    FOR_EACH_BACKEND(Write_Parameter(name, value));
+    FOR_EACH_BACKEND(Write_Parameter(name, value, quiet_nanf()));
 }
 
 void AP_Logger::Write_Mission_Cmd(const AP_Mission &mission,
@@ -876,6 +888,13 @@ void AP_Logger::Write_RallyPoint(uint8_t total,
 void AP_Logger::Write_Rally()
 {
     FOR_EACH_BACKEND(Write_Rally());
+}
+#endif
+
+#if HAL_LOGGER_FENCE_ENABLED
+void AP_Logger::Write_Fence()
+{
+    FOR_EACH_BACKEND(Write_Fence());
 }
 #endif
 
@@ -1085,12 +1104,6 @@ AP_Logger::log_write_fmt *AP_Logger::msg_fmt_for_name(const char *name, const ch
         }
     }
 
-#if APM_BUILD_TYPE(APM_BUILD_Replay)
-    // don't allow for new msg types during replay. We will be able to
-    // support these eventually, but for now they cause corruption
-    return nullptr;
-#endif
-
     f = (struct log_write_fmt *)calloc(1, sizeof(*f));
     if (f == nullptr) {
         // out of memory
@@ -1205,8 +1218,9 @@ bool AP_Logger::msg_type_in_use(const uint8_t msg_type) const
 // find a free message type
 int16_t AP_Logger::find_free_msg_type() const
 {
+    const uint8_t start = LOGGING_FIRST_DYNAMIC_MSGID;
     // avoid using 255 here; perhaps we want to use it to extend things later
-    for (uint16_t msg_type=254; msg_type>0; msg_type--) { // more likely to be free at end
+    for (uint16_t msg_type=start; msg_type>0; msg_type--) { // more likely to be free at end
         if (! msg_type_in_use(msg_type)) {
             return msg_type;
         }

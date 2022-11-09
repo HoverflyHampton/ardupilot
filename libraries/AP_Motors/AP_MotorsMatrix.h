@@ -60,7 +60,7 @@ public:
 
     // get_motor_mask - returns a bitmask of which outputs are being used for motors (1 means being used)
     //  this can be used to ensure other pwm outputs (i.e. for servos) do not conflict
-    uint16_t            get_motor_mask() override;
+    uint32_t            get_motor_mask() override;
 
     // return number of motor that has failed.  Should only be called if get_thrust_boost() returns true
     uint8_t             get_lost_motor() const override { return _motor_lost_index; }
@@ -150,6 +150,16 @@ protected:
 
     const char*         _frame_class_string = ""; // string representation of frame class
     const char*         _frame_type_string = "";  //  string representation of frame type
+
 private:
+    // setup motors matrix
+    bool setup_quad_matrix(motor_frame_type frame_type);
+    bool setup_hexa_matrix(motor_frame_type frame_type);
+    bool setup_octa_matrix(motor_frame_type frame_type);
+    bool setup_deca_matrix(motor_frame_type frame_type);
+    bool setup_dodecahexa_matrix(motor_frame_type frame_type);
+    bool setup_y6_matrix(motor_frame_type frame_type);
+    bool setup_octaquad_matrix(motor_frame_type frame_type);
+
     static AP_MotorsMatrix *_singleton;
 };

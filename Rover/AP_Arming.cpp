@@ -71,6 +71,11 @@ bool AP_Arming_Rover::gps_checks(bool display_failure)
 
 bool AP_Arming_Rover::pre_arm_checks(bool report)
 {
+    if (armed) {
+        // if we are already armed then skip the checks
+        return true;
+    }
+
     //are arming checks disabled?
     if (checks_to_perform == 0) {
         return true;
@@ -157,7 +162,7 @@ bool AP_Arming_Rover::disarm(const AP_Arming::Method method, bool do_disarm_chec
 // check object avoidance has initialised correctly
 bool AP_Arming_Rover::oa_check(bool report)
 {
-    char failure_msg[50];
+    char failure_msg[50] = {};
     if (rover.g2.oa.pre_arm_check(failure_msg, ARRAY_SIZE(failure_msg))) {
         return true;
     }
@@ -205,7 +210,7 @@ bool AP_Arming_Rover::motor_checks(bool report)
     bool ret = rover.g2.motors.pre_arm_check(report);
 
 #if HAL_TORQEEDO_ENABLED
-    char failure_msg[50];
+    char failure_msg[50] = {};
     AP_Torqeedo *torqeedo = AP_Torqeedo::get_singleton();
     if (torqeedo != nullptr) {
         if (!torqeedo->pre_arm_checks(failure_msg, ARRAY_SIZE(failure_msg))) {

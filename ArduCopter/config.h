@@ -145,10 +145,6 @@
  #define FS_TERRAIN_TIMEOUT_MS          5000     // 5 seconds of missing terrain data will trigger failsafe (RTL)
 #endif
 
-#ifndef PREARM_DISPLAY_PERIOD
-# define PREARM_DISPLAY_PERIOD 30
-#endif
-
 // pre-arm baro vs inertial nav max alt disparity
 #ifndef PREARM_MAX_ALT_DISPARITY_CM
  # define PREARM_MAX_ALT_DISPARITY_CM       100     // barometer and inertial nav altitude must be within this many centimeters
@@ -324,6 +320,12 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
+// Flowhold - use optical flow to hover in place
+#ifndef MODE_FLOWHOLD_ENABLED
+# define MODE_FLOWHOLD_ENABLED !HAL_MINIMIZE_FEATURES && AP_OPTICALFLOW_ENABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////
 // Autorotate - autonomous auto-rotation - helicopters only
@@ -420,6 +422,9 @@
 //
 #ifndef LAND_DETECTOR_TRIGGER_SEC
  # define LAND_DETECTOR_TRIGGER_SEC         1.0f    // number of seconds to detect a landing
+#endif
+#ifndef LAND_AIRMODE_DETECTOR_TRIGGER_SEC
+ # define LAND_AIRMODE_DETECTOR_TRIGGER_SEC 3.0f    // number of seconds to detect a landing in air mode
 #endif
 #ifndef LAND_DETECTOR_MAYBE_TRIGGER_SEC
  # define LAND_DETECTOR_MAYBE_TRIGGER_SEC   0.2f    // number of seconds that means we might be landed (used to reset horizontal position targets to prevent tipping over)
@@ -623,11 +628,6 @@
 // Fence, Rally and Terrain and AC_Avoidance defaults
 //
 
-// Enable/disable Fence
-#ifndef AC_FENCE
- #define AC_FENCE ENABLED
-#endif
-
 #ifndef AC_RALLY
  #define AC_RALLY   ENABLED
 #endif
@@ -642,10 +642,6 @@
 
 #ifndef AC_OAPATHPLANNER_ENABLED
  #define AC_OAPATHPLANNER_ENABLED   !HAL_MINIMIZE_FEATURES
-#endif
-
-#if AC_AVOID_ENABLED && !AC_FENCE
-  #error AC_Avoidance relies on AC_FENCE which is disabled
 #endif
 
 #if MODE_FOLLOW_ENABLED && !AC_AVOID_ENABLED
@@ -688,11 +684,6 @@
 // Developer Items
 //
 
-//use this to completely disable FRSKY TELEM
-#ifndef FRSKY_TELEM_ENABLED
-  #  define FRSKY_TELEM_ENABLED          ENABLED
-#endif
-
 #ifndef ADVANCED_FAILSAFE
 # define ADVANCED_FAILSAFE DISABLED
 #endif
@@ -719,4 +710,8 @@
 
 #ifndef HAL_FRAME_TYPE_DEFAULT
 #define HAL_FRAME_TYPE_DEFAULT AP_Motors::MOTOR_FRAME_TYPE_X
+#endif
+
+#ifndef AC_CUSTOMCONTROL_MULTI_ENABLED
+#define AC_CUSTOMCONTROL_MULTI_ENABLED FRAME_CONFIG == MULTICOPTER_FRAME && AP_CUSTOMCONTROL_ENABLED
 #endif

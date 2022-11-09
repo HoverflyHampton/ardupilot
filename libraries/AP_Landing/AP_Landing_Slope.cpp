@@ -23,6 +23,7 @@
 #include <AP_LandingGear/AP_LandingGear.h>
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_GPS/AP_GPS.h>
+#include <AP_Logger/AP_Logger.h>
 
 void AP_Landing::type_slope_do_land(const AP_Mission::Mission_Command& cmd, const float relative_altitude)
 {
@@ -408,7 +409,7 @@ void AP_Landing::type_slope_log(void) const
 // @Field: slopeInit: Initial slope to landing point
 // @Field: altO: Rangefinder correction
 // @Field: fh: Height for flare timing.
-    AP::logger().Write("LAND", "TimeUS,stage,f1,f2,slope,slopeInit,altO,fh", "QBBBffff",
+    AP::logger().WriteStreaming("LAND", "TimeUS,stage,f1,f2,slope,slopeInit,altO,fh", "QBBBffff",
                                             AP_HAL::micros64(),
                                             type_slope_stage,
                                             flags,

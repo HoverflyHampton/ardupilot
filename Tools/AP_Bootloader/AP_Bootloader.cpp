@@ -77,7 +77,7 @@ int main(void)
     AFIO->MAPR = mapr | AFIO_MAPR_CAN_REMAP_REMAP2 | AFIO_MAPR_SPI3_REMAP;
 #endif
 
-#ifdef HAL_FLASH_PROTECTION
+#if HAL_FLASH_PROTECTION
     stm32_flash_unprotect_flash();
 #endif
 
@@ -109,6 +109,7 @@ int main(void)
         // bad firmware CRC, don't try and boot
         timeout = 0;
         try_boot = false;
+        led_set(LED_BAD_FW);
     }
 #ifndef BOOTLOADER_DEV_LIST
     else if (timeout != 0) {
@@ -131,6 +132,7 @@ int main(void)
         // bad firmware, don't try and boot
         timeout = 0;
         try_boot = false;
+        led_set(LED_BAD_FW);
     }
 #endif
 

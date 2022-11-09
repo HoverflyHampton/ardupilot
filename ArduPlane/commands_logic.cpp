@@ -98,7 +98,7 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
         return quadplane.do_vtol_takeoff(cmd);
 
     case MAV_CMD_NAV_VTOL_LAND:
-        if (quadplane.options & QuadPlane::OPTION_MISSION_LAND_FW_APPROACH) {
+        if (quadplane.landing_with_fixed_wing_spiral_approach()) {
             // the user wants to approach the landing in a fixed wing flight mode
             // the waypoint will be used as a loiter_to_alt
             // after which point the plane will compute the optimal into the wind direction
@@ -142,7 +142,7 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
         break;
 
     case MAV_CMD_DO_FENCE_ENABLE:
-#if AC_FENCE == ENABLED
+#if AP_FENCE_ENABLED
         if (cmd.p1 == 0) { // disable fence
             plane.fence.enable(false);
             gcs().send_text(MAV_SEVERITY_INFO, "Fence disabled");
@@ -180,9 +180,7 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
 
     case MAV_CMD_DO_MOUNT_CONTROL:          // 205
         // point the camera to a specified angle
-        camera_mount.set_angle_targets(cmd.content.mount_control.roll, 
-                                       cmd.content.mount_control.pitch, 
-                                       cmd.content.mount_control.yaw);
+        camera_mount.set_angle_target(cmd.content.mount_control.roll, cmd.content.mount_control.pitch, cmd.content.mount_control.yaw, false);
         break;
 #endif
 
@@ -192,17 +190,23 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
         break;
 #endif
 
+#if AP_ICENGINE_ENABLED
     case MAV_CMD_DO_ENGINE_CONTROL:
         plane.g2.ice_control.engine_control(cmd.content.do_engine_control.start_control,
                                             cmd.content.do_engine_control.cold_start,
                                             cmd.content.do_engine_control.height_delay_cm*0.01f);
         break;
+#endif
 
 #if AP_SCRIPTING_ENABLED
     case MAV_CMD_NAV_SCRIPT_TIME:
         do_nav_script_time(cmd);
         break;
 #endif
+
+    case MAV_CMD_NAV_DELAY:
+        do_nav_delay(cmd);
+        break;
         
     default:
         // unable to use the command, allow the vehicle to try the next command
@@ -282,7 +286,7 @@ bool Plane::verify_command(const AP_Mission::Mission_Command& cmd)        // Ret
     case MAV_CMD_NAV_VTOL_TAKEOFF:
         return quadplane.verify_vtol_takeoff(cmd);
     case MAV_CMD_NAV_VTOL_LAND:
-        if ((quadplane.options & QuadPlane::OPTION_MISSION_LAND_FW_APPROACH) && !verify_landing_vtol_approach(cmd)) {
+        if (quadplane.landing_with_fixed_wing_spiral_approach() && !verify_landing_vtol_approach(cmd)) {
             // verify_landing_vtol_approach will return true once we have completed the approach,
             // in which case we fall over to normal vtol landing code
             return false;
@@ -303,7 +307,10 @@ bool Plane::verify_command(const AP_Mission::Mission_Command& cmd)        // Ret
     case MAV_CMD_NAV_SCRIPT_TIME:
         return verify_nav_script_time(cmd);
 #endif
-        
+
+     case MAV_CMD_NAV_DELAY:
+         return verify_nav_delay(cmd);
+
     // do commands (always return true)
     case MAV_CMD_DO_CHANGE_SPEED:
     case MAV_CMD_DO_SET_HOME:
@@ -411,7 +418,7 @@ void Plane::do_land(const AP_Mission::Mission_Command& cmd)
         set_flight_stage(AP_Vehicle::FixedWing::FLIGHT_LAND);
     }
 
-#if AC_FENCE == ENABLED
+#if AP_FENCE_ENABLED
     plane.fence.auto_disable_fence_for_landing();
 #endif
 }
@@ -423,15 +430,6 @@ void Plane::do_landing_vtol_approach(const AP_Mission::Mission_Command& cmd)
     Location loc = cmd.content.location;
     loc.sanitize(current_loc);
     set_next_WP(loc);
-
-    // only set the direction if the quadplane landing radius override is not 0
-    // if it's 0 update_loiter will manage the direction for us when we hand it
-    // 0 later in the controller
-    if (is_negative(quadplane.fw_land_approach_radius)) {
-        loiter.direction = -1;
-    } else if (is_positive(quadplane.fw_land_approach_radius)) {
-        loiter.direction = 1;
-    }
 
     vtol_approach_s.approach_stage = LOITER_TO_ALT;
 }
@@ -522,6 +520,21 @@ void Plane::do_loiter_to_alt(const AP_Mission::Mission_Command& cmd)
     condition_value = 0;
 }
 
+// do_nav_delay - Delay the next navigation command
+void Plane::do_nav_delay(const AP_Mission::Mission_Command& cmd)
+{
+    nav_delay.time_start_ms = millis();
+
+    if (cmd.content.nav_delay.seconds > 0) {
+        // relative delay
+        nav_delay.time_max_ms = cmd.content.nav_delay.seconds * 1000; // convert seconds to milliseconds
+    } else {
+        // absolute delay to utc time
+        nav_delay.time_max_ms = AP::rtc().get_time_utc(cmd.content.nav_delay.hour_utc, cmd.content.nav_delay.min_utc, cmd.content.nav_delay.sec_utc, 0);
+    }
+    gcs().send_text(MAV_SEVERITY_INFO, "Delaying %u sec", (unsigned)(nav_delay.time_max_ms/1000));
+}
+
 /********************************************************************************/
 //  Verify Nav (Must) commands
 /********************************************************************************/
@@ -588,7 +601,7 @@ bool Plane::verify_takeoff()
         auto_state.takeoff_complete = true;
         next_WP_loc = prev_WP_loc = current_loc;
 
-#if AC_FENCE == ENABLED
+#if AP_FENCE_ENABLED
         plane.fence.auto_enable_fence_after_takeoff();
 #endif
 
@@ -854,6 +867,20 @@ bool Plane::verify_altitude_wait(const AP_Mission::Mission_Command &cmd)
     return false;
 }
 
+// verify_nav_delay - check if we have waited long enough
+bool Plane::verify_nav_delay(const AP_Mission::Mission_Command& cmd)
+{
+    if (hal.util->get_soft_armed()) {
+        // don't delay while armed, we need a nav controller running
+        return true;
+    }
+    if (millis() - nav_delay.time_start_ms > nav_delay.time_max_ms) {
+        nav_delay.time_max_ms = 0;
+        return true;
+    }
+    return false;
+}
+
 /********************************************************************************/
 //  Condition (May) commands
 /********************************************************************************/
@@ -910,8 +937,12 @@ bool Plane::do_change_speed(const AP_Mission::Mission_Command& cmd)
     switch (cmd.content.speed.speed_type)
     {
     case 0:             // Airspeed
-        if ((cmd.content.speed.target_ms >= aparm.airspeed_min.get()) && (cmd.content.speed.target_ms <= aparm.airspeed_max.get()))  {
-           new_airspeed_cm = cmd.content.speed.target_ms * 100; //new airspeed target for AUTO or GUIDED modes
+        if (is_equal(cmd.content.speed.target_ms, -2.0f)) {
+            new_airspeed_cm = -1; // return to default airspeed
+            return true;
+        } else if ((cmd.content.speed.target_ms >= aparm.airspeed_min.get()) &&
+                   (cmd.content.speed.target_ms <= aparm.airspeed_max.get()))  {
+            new_airspeed_cm = cmd.content.speed.target_ms * 100; //new airspeed target for AUTO or GUIDED modes
             gcs().send_text(MAV_SEVERITY_INFO, "Set airspeed %u m/s", (unsigned)cmd.content.speed.target_ms);
             return true;
         }
@@ -992,7 +1023,7 @@ bool Plane::verify_landing_vtol_approach(const AP_Mission::Mission_Command &cmd)
         case RTL:
             {
                 // fly home and loiter at RTL alt
-                update_loiter(fabsf(quadplane.fw_land_approach_radius));
+                nav_controller->update_loiter(cmd.content.location, abs_radius, direction);
                 if (plane.reached_loiter_target()) {
                     // decend to Q RTL alt
                     plane.do_RTL(plane.home.alt + plane.quadplane.qrtl_alt*100UL);
@@ -1003,7 +1034,7 @@ bool Plane::verify_landing_vtol_approach(const AP_Mission::Mission_Command &cmd)
             }
         case LOITER_TO_ALT:
             {
-                update_loiter(fabsf(quadplane.fw_land_approach_radius));
+                nav_controller->update_loiter(cmd.content.location, abs_radius, direction);
 
                 if (labs(loiter.sum_cd) > 1 && (loiter.reached_target_alt || loiter.unable_to_acheive_target_alt)) {
                     Vector3f wind = ahrs.wind_estimate();
@@ -1019,7 +1050,7 @@ bool Plane::verify_landing_vtol_approach(const AP_Mission::Mission_Command &cmd)
                 // require an angle total of at least 2 centidegrees, due to special casing of 1 centidegree
                 if (((fabsf(cmd.content.location.get_distance(current_loc) - abs_radius) > 5.0f) &&
                       (cmd.content.location.get_distance(current_loc) < abs_radius)) ||
-                    (loiter.sum_cd < 2)) {
+                    (labs(loiter.sum_cd) < 2)) {
                     nav_controller->update_loiter(cmd.content.location, abs_radius, direction);
                     break;
                 }
@@ -1030,10 +1061,10 @@ bool Plane::verify_landing_vtol_approach(const AP_Mission::Mission_Command &cmd)
             {
                 nav_controller->update_loiter(cmd.content.location, radius, direction);
 
-                const float breakout_direction_rad = radians(wrap_180(vtol_approach_s.approach_direction_deg + (direction > 0 ? 270 : 90)));
+                const float breakout_direction_rad = radians(vtol_approach_s.approach_direction_deg + (direction > 0 ? 270 : 90));
 
                 // breakout when within 5 degrees of the opposite direction
-                if (fabsf(ahrs.yaw - breakout_direction_rad) < radians(5.0f)) {
+                if (fabsf(wrap_PI(ahrs.yaw - breakout_direction_rad)) < radians(5.0f)) {
                     gcs().send_text(MAV_SEVERITY_INFO, "Starting VTOL land approach path");
                     vtol_approach_s.approach_stage = APPROACH_LINE;
                     set_next_WP(cmd.content.location);
@@ -1056,17 +1087,18 @@ bool Plane::verify_landing_vtol_approach(const AP_Mission::Mission_Command &cmd)
                 nav_controller->update_waypoint(start, end);
 
                 // check if we should move on to the next waypoint
-                Location breakout_loc = cmd.content.location;
-                breakout_loc.offset_bearing(vtol_approach_s.approach_direction_deg + 180, quadplane.stopping_distance());
+                Location breakout_stopping_loc = cmd.content.location;
+                breakout_stopping_loc.offset_bearing(vtol_approach_s.approach_direction_deg + 180, quadplane.stopping_distance());
+                const bool past_finish_line = current_loc.past_interval_finish_line(start, breakout_stopping_loc);
 
-                const bool past_finish_line = current_loc.past_interval_finish_line(start, breakout_loc);
-                const bool half_radius = current_loc.get_distance(cmd.content.location) < 0.5 * abs_radius;
+                Location breakout_loc = cmd.content.location;
+                breakout_loc.offset_bearing(vtol_approach_s.approach_direction_deg + 180, abs_radius);
+                const bool half_radius = current_loc.line_path_proportion(breakout_loc, cmd.content.location) > 0.5;
                 bool lined_up = true;
                 Vector3f vel_NED;
                 if (ahrs.get_velocity_NED(vel_NED)) {
-                    const float ground_course_deg = wrap_180(degrees(vel_NED.xy().angle()));
-                    const float approach_deg = wrap_180(vtol_approach_s.approach_direction_deg);
-                    const float angle_err = fabsf(wrap_180(ground_course_deg - approach_deg));
+                    const Vector2f target_vec = current_loc.get_distance_NE(cmd.content.location);
+                    const float angle_err = fabsf(wrap_180(degrees(vel_NED.xy().angle(target_vec))));
                     lined_up = (angle_err < 30);
                 }
 

@@ -5,6 +5,7 @@
 #include "AP_Common/AP_FWVersion.h"
 #include <AP_InternalError/AP_InternalError.h>
 #include <AP_Scheduler/AP_Scheduler.h>
+#include <AP_Rally/AP_Rally.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -172,8 +173,10 @@ void AP_Logger_Backend::WriteMoreStartupMessages()
 bool AP_Logger_Backend::Write_Emit_FMT(uint8_t msg_type)
 {
 #if APM_BUILD_TYPE(APM_BUILD_Replay)
-    // sure, sure we did....
-    return true;
+    if (msg_type < REPLAY_LOG_NEW_MSG_MIN || msg_type > REPLAY_LOG_NEW_MSG_MAX) {
+        // don't re-emit FMU msgs unless they are in the replay range
+        return true;
+    }
 #endif
 
     // get log structure from front end:
@@ -444,7 +447,7 @@ bool AP_Logger_Backend::ShouldLog(bool is_critical)
         _front._last_mavlink_log_transfer_message_handled_ms != 0) {
         if (AP_HAL::millis() - _front._last_mavlink_log_transfer_message_handled_ms < 10000) {
             if (!_front.vehicle_is_armed()) {
-                // user is transfering files via mavlink
+                // user is transferring files via mavlink
                 return false;
             }
         } else {
@@ -519,6 +522,32 @@ bool AP_Logger_Backend::Write_Rally()
     return _startup_messagewriter->writeallrallypoints();
 }
 #endif
+
+#if HAL_LOGGER_FENCE_ENABLED
+// Write a fence point
+bool AP_Logger_Backend::Write_FencePoint(uint8_t total, uint8_t sequence, const AC_PolyFenceItem &fence_point)
+{
+    const struct log_Fence pkt_fence{
+        LOG_PACKET_HEADER_INIT(LOG_FENCE_MSG),
+        time_us         : AP_HAL::micros64(),
+        total           : total,
+        sequence        : sequence,
+        type            : uint8_t(fence_point.type),
+        latitude        : fence_point.loc.x,
+        longitude       : fence_point.loc.y,
+        vertex_count    : fence_point.vertex_count,
+        radius          : fence_point.radius
+    };
+    return WriteBlock(&pkt_fence, sizeof(pkt_fence));
+}
+
+// Write all fence points
+bool AP_Logger_Backend::Write_Fence()
+{
+    // kick off asynchronous write:
+    return _startup_messagewriter->writeallfence();
+}
+#endif // HAL_LOGGER_FENCE_ENABLED
 
 
 bool AP_Logger_Backend::Write_VER()
@@ -655,9 +684,8 @@ AP_Logger_RateLimiter::AP_Logger_RateLimiter(const AP_Logger &_front, const AP_F
  */
 bool AP_Logger_RateLimiter::should_log_streaming(uint8_t msgid)
 {
-    if (rate_limit_hz <= 0) {
-        // no limiting (user changed the parameter)
-        return true;
+    if (front._log_pause) {
+        return false;
     }
     const uint16_t now = AP_HAL::millis16();
     uint16_t delta_ms = now - last_send_ms[msgid];
@@ -675,8 +703,8 @@ bool AP_Logger_RateLimiter::should_log_streaming(uint8_t msgid)
  */
 bool AP_Logger_RateLimiter::should_log(uint8_t msgid, bool writev_streaming)
 {
-    if (rate_limit_hz <= 0) {
-        // no limiting (user changed the parameter)
+    if (rate_limit_hz <= 0 && !front._log_pause) {
+        // no rate limiting if not paused and rate is zero(user changed the parameter)
         return true;
     }
     if (last_send_ms[msgid] == 0 && !writev_streaming) {

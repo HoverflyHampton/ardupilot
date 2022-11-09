@@ -32,7 +32,6 @@
 #include <AP_NavEKF/AP_NavEKF_Source.h>
 #include <AP_NavEKF/EKF_Buffer.h>
 #include <AP_InertialSensor/AP_InertialSensor.h>
-#include <GCS_MAVLink/GCS_MAVLink.h>
 #include <AP_DAL/AP_DAL.h>
 
 #include "AP_NavEKF/EKFGSF_yaw.h"
@@ -139,7 +138,10 @@ public:
     // If false returned, do not use for flight control
     bool getPosNE(Vector2f &posNE) const;
 
-    // Write the last calculated D position relative to the reference point (m).
+    // get position D from local origin
+    bool getPosD_local(float &posD) const;
+
+    // Write the last calculated D position relative to the public origin
     // If a calculated solution is not available, use the best available data and return false
     // If false returned, do not use for flight control
     bool getPosD(float &posD) const;
@@ -150,6 +152,10 @@ public:
     // return estimate of true airspeed vector in body frame in m/s
     // returns false if estimate is unavailable
     bool getAirSpdVec(Vector3f &vel) const;
+
+    // return the innovation in m/s, innovation variance in (m/s)^2 and age in msec of the last TAS measurement processed
+    // returns false if the data is unavailable
+    bool getAirSpdHealthData(float &innovation, float &innovationVariance, uint32_t &age_ms) const;
 
     // Return the rate of change of vertical position in the down direction (dPosD/dt) in m/s
     // This can be different to the z component of the EKF velocity state because it will fluctuate with height errors and corrections in the EKF
@@ -303,7 +309,7 @@ public:
     * Write position and quaternion data from an external navigation system
     *
     * pos        : position in the RH navigation frame. Frame is assumed to be NED if frameIsNED is true. (m)
-    * quat       : quaternion desribing the the rotation from navigation frame to body frame
+    * quat       : quaternion desribing the rotation from navigation frame to body frame
     * posErr     : 1-sigma spherical position error (m)
     * angErr     : 1-sigma spherical angle error (rad)
     * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
@@ -352,7 +358,7 @@ public:
     void getFilterStatus(nav_filter_status &status) const;
 
     // send an EKF_STATUS_REPORT message to GCS
-    void send_status_report(mavlink_channel_t chan) const;
+    void send_status_report(class GCS_MAVLINK &link) const;
 
     // provides the height limit to be observed by the control loops
     // returns false if no height limiting is required
@@ -556,6 +562,7 @@ private:
     struct tas_elements : EKF_obs_element_t {
         ftype       tas;            // true airspeed measurement (m/sec)
         ftype       tasVariance;    // variance of true airspeed measurement (m/sec)^2
+        bool        allowFusion;    // true if measurement can be allowed to modify EKF states.
     };
 
     struct of_elements : EKF_obs_element_t {
@@ -983,6 +990,7 @@ private:
     bool hgtTimeout;                // boolean true if height measurements have failed innovation consistency check and timed out
     bool magTimeout;                // boolean true if magnetometer measurements have failed for too long and have timed out
     bool tasTimeout;                // boolean true if true airspeed measurements have failed for too long and have timed out
+    bool dragTimeout;               // boolean true if drag measurements have failed for too long and have timed out
     bool badIMUdata;                // boolean true if the bad IMU data is detected
     uint32_t badIMUdata_ms;         // time stamp bad IMU data was last detected
     uint32_t goodIMUdata_ms;        // time stamp good IMU data was last detected
@@ -1047,6 +1055,7 @@ private:
     uint32_t lastSynthYawTime_ms;   // time stamp when yaw observation was last fused (msec)
     uint32_t ekfStartTime_ms;       // time the EKF was started (msec)
     Vector2F lastKnownPositionNE;   // last known position
+    float lastKnownPositionD;       // last known height
     uint32_t lastLaunchAccelTime_ms;
     ftype velTestRatio;             // sum of squares of GPS velocity innovation divided by fail threshold
     ftype posTestRatio;             // sum of squares of GPS position innovation divided by fail threshold
@@ -1162,13 +1171,17 @@ private:
 
     // variable used by the in-flight GPS quality check
     bool gpsSpdAccPass;             // true when reported GPS speed accuracy passes in-flight checks
+    bool gpsVertAccPass;            // true when reported GPS vertical accuracy passes in-flight checks
     bool ekfInnovationsPass;        // true when GPS innovations pass in-flight checks
     ftype sAccFilterState1;         // state variable for LPF applied to reported GPS speed accuracy
     ftype sAccFilterState2;         // state variable for peak hold filter applied to reported GPS speed
     uint32_t lastGpsCheckTime_ms;   // last time in msec the GPS quality was checked
-    uint32_t lastInnovPassTime_ms;  // last time in msec the GPS innovations passed
-    uint32_t lastInnovFailTime_ms;  // last time in msec the GPS innovations failed
+    uint32_t lastGpsInnovPassTime_ms;  // last time in msec the GPS innovations passed
+    uint32_t lastGpsInnovFailTime_ms;  // last time in msec the GPS innovations failed
+    uint32_t lastGpsVertAccPassTime_ms;  // last time in msec the GPS vertical accuracy test passed
+    uint32_t lastGpsVertAccFailTime_ms;  // last time in msec the GPS vertical accuracy test failed
     bool gpsAccuracyGood;           // true when the GPS accuracy is considered to be good enough for safe flight.
+    bool gpsAccuracyGoodForAltitude; // true when the GPS accuracy is considered to be good enough to use it as an altitude source.
     Vector3F gpsVelInnov;           // gps velocity innovations
     Vector3F gpsVelVarInnov;        // gps velocity innovation variances
     uint32_t gpsVelInnovTime_ms;    // system time that gps velocity innovations were recorded (to detect timeouts)
@@ -1319,6 +1332,7 @@ private:
 	Vector2F innovDragVar;	            // multirotor drag measurement innovation variance ((m/sec**2)**2)
 	Vector2F dragTestRatio;		        // drag innovation consistency check ratio
 #endif
+	uint32_t lastDragPassTime_ms;       // system time that drag samples were last successfully fused
     bool dragFusionEnabled;
 
     // height source selection logic

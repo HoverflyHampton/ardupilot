@@ -3,6 +3,7 @@
 #include "AP_NavEKF2_core.h"
 #include <AP_DAL/AP_DAL.h>
 #include <AP_AHRS/AP_AHRS.h>
+#include <GCS_MAVLink/GCS.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -285,9 +286,7 @@ bool NavEKF2_core::getLLH(struct Location &loc) const
 
     if(getPosD(posD) && getOriginLLH(origin)) {
         // Altitude returned is an absolute altitude relative to the WGS-84 spherioid
-        loc.alt =  origin.alt - posD*100;
-        loc.relative_alt = 0;
-        loc.terrain_alt = 0;
+        loc.set_alt_cm(origin.alt - posD*100, Location::AltFrame::ABSOLUTE);
 
         // there are three modes of operation, absolute position (GPS fusion), relative position (optical flow fusion) and constant position (no aiding)
         if (filterStatus.flags.horiz_pos_abs || filterStatus.flags.horiz_pos_rel) {
@@ -322,10 +321,7 @@ bool NavEKF2_core::getLLH(struct Location &loc) const
         // If no origin has been defined for the EKF, then we cannot use its position states so return a raw
         // GPS reading if available and return false
         if ((gps.status() >= AP_DAL_GPS::GPS_OK_FIX_3D)) {
-            const struct Location &gpsloc = gps.location();
-            loc = gpsloc;
-            loc.relative_alt = 0;
-            loc.terrain_alt = 0;
+            loc = gps.location();
         }
         return false;
     }
@@ -497,8 +493,9 @@ void  NavEKF2_core::getFilterGpsStatus(nav_gps_status &faults) const
     faults.flags.bad_horiz_vel      = gpsCheckStatus.bad_horiz_vel; // The GPS horizontal speed is excessive (check assumes the vehicle is static)
 }
 
+#if HAL_GCS_ENABLED
 // send an EKF_STATUS message to GCS
-void NavEKF2_core::send_status_report(mavlink_channel_t chan) const
+void NavEKF2_core::send_status_report(GCS_MAVLINK &link) const
 {
     // prepare flags
     uint16_t flags = 0;
@@ -555,8 +552,9 @@ void NavEKF2_core::send_status_report(mavlink_channel_t chan) const
     }
 
     // send message
-    mavlink_msg_ekf_status_report_send(chan, flags, velVar, posVar, hgtVar, mag_max, temp, tasVar);
+    mavlink_msg_ekf_status_report_send(link.get_chan(), flags, velVar, posVar, hgtVar, mag_max, temp, tasVar);
 }
+#endif  // HAL_GCS_ENABLED
 
 // report the reason for why the backend is refusing to initialise
 const char *NavEKF2_core::prearm_failure_reason(void) const

@@ -37,7 +37,7 @@ function bind_add_param(name, idx, default_value)
 end
 
 -- setup quicktune specific parameters
-assert(param:add_table(PARAM_TABLE_KEY, PARAM_TABLE_PREFIX, 11), 'could not add param table')
+assert(param:add_table(PARAM_TABLE_KEY, PARAM_TABLE_PREFIX, 12), 'could not add param table')
 
 local QUIK_ENABLE      = bind_add_param('ENABLE',         1, 0) 
 local QUIK_AXES        = bind_add_param('AXES',           2, 7)
@@ -50,6 +50,7 @@ local QUIK_RP_PI_RATIO = bind_add_param('RP_PI_RATIO',    8, 1.0)
 local QUIK_Y_PI_RATIO  = bind_add_param('Y_PI_RATIO',     9, 10)
 local QUIK_AUTO_FILTER = bind_add_param('AUTO_FILTER',   10, 1)
 local QUIK_AUTO_SAVE   = bind_add_param('AUTO_SAVE',     11, 0)
+local QUIK_RC_FUNC     = bind_add_param('RC_FUNC',       12, 300)
 
 local INS_GYRO_FILTER  = bind_param("INS_GYRO_FILTER")
 
@@ -171,6 +172,9 @@ end
 
 -- setup filter frequencies
 function setup_filters(axis)
+   if QUIK_AUTO_FILTER:get() <= 0 then
+      return
+   end
    local fltd = axis .. "_FLTD"
    local fltt = axis .. "_FLTT"
    local flte = axis .. "_FLTE"
@@ -316,7 +320,7 @@ function update_slew_gain()
       local ax_stage = string.sub(slew_parm, -1)
       adjust_gain(slew_parm, P:get()+slew_delta)
       slew_steps = slew_steps - 1
-      logger.write('QUIK','SRate,Gain,Param', 'ffn', get_slew_rate(axis), P:get(), axis .. ax_stage)
+      logger:write('QUIK','SRate,Gain,Param', 'ffn', get_slew_rate(axis), P:get(), axis .. ax_stage)
       if slew_steps == 0 then
          gcs:send_text(MAV_SEVERITY_INFO, string.format("%s %.4f", slew_parm, P:get()))
          slew_parm = nil
@@ -354,7 +358,7 @@ end
 local last_warning = get_time()
 function update()
    if quick_switch == nil then
-      quick_switch = rc:find_channel_for_option(300)
+      quick_switch = rc:find_channel_for_option(math.floor(QUIK_RC_FUNC:get()))
    end
    if quick_switch == nil or QUIK_ENABLE:get() < 1 then
       return
@@ -455,7 +459,7 @@ function update()
          adjust_gain(P_name, new_P)
       end
       setup_slew_gain(pname, new_gain)
-      logger.write('QUIK','SRate,Gain,Param', 'ffn', srate, P:get(), axis .. stage)
+      logger:write('QUIK','SRate,Gain,Param', 'ffn', srate, P:get(), axis .. stage)
       gcs:send_text(6, string.format("Tuning: %s done", pname))
       advance_stage(axis)
       last_stage_change = get_time()
@@ -465,7 +469,7 @@ function update()
          new_gain = 0.001
       end
       adjust_gain(pname, new_gain)
-      logger.write('QUIK','SRate,Gain,Param', 'ffn', srate, P:get(), axis .. stage)
+      logger:write('QUIK','SRate,Gain,Param', 'ffn', srate, P:get(), axis .. stage)
       if get_time() - last_gain_report > 3 then
          last_gain_report = get_time()
          gcs:send_text(MAV_SEVERITY_INFO, string.format("%s %.4f sr:%.2f", pname, new_gain, srate))

@@ -23,7 +23,11 @@
 #include "AP_UAVCAN.h"
 
 #ifndef UAVCAN_NODE_POOL_BLOCK_SIZE
+#if HAL_CANFD_SUPPORTED
+#define UAVCAN_NODE_POOL_BLOCK_SIZE 128
+#else
 #define UAVCAN_NODE_POOL_BLOCK_SIZE 64
+#endif
 #endif
 
 class AP_PoolAllocator : public uavcan::IPoolAllocator

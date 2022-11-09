@@ -48,6 +48,7 @@ TARGET_HW_ATL_MANTIS_EDU               97
 Reserved  PX4 [BL] FMU v5X.x           51
 Reserved "PX4 [BL] FMU v6.x"           52
 Reserved "PX4 [BL] FMU v6X.x"          53
+Reserved "PX4 [BL] FMU v6C.x"          56
  
 Reserved "GUMSTIX [BL] FMU v6"         54
 Reserved "ARK CAN FLOW"                80
@@ -154,6 +155,7 @@ AP_HW_SierraF405                     1052
 AP_HW_CarbonixL496                   1053
 AP_HW_MatekF405_TE                   1054
 AP_HW_SierraF412                     1055
+AP_HW_BEASTH7v2                      1056
 AP_HW_BEASTF7v2                      1057
 AP_HW_KakuteH7Mini                   1058
 AP_HW_JHEMCUGSF405A                  1059
@@ -171,6 +173,11 @@ AP_HW_CUBERED_IO                     1070
 AP_HW_GreenSight_UltraBlue           1071
 AP_HW_GreenSight_microBlue           1072
 AP_HW_MAMBAH743_V4                   1073
+AP_HW_REAPERF745_V2                  1074
+AP_HW_SKYSTARSH7HD                   1075
+AP_HW_PixSurveyA1                    1076
+AP_HW_AEROFOX_AIRSPEED               1077
+AP_HW_ATOMRCF405                     1078
 
 AP_HW_CUBEORANGE_PERIPH              1400
 AP_HW_CUBEBLACK_PERIPH               1401

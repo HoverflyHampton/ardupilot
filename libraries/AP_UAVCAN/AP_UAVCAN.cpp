@@ -48,6 +48,7 @@
 #include <AP_Arming/AP_Arming.h>
 #include <AP_Baro/AP_Baro_UAVCAN.h>
 #include <AP_RangeFinder/AP_RangeFinder_UAVCAN.h>
+#include <AP_EFI/AP_EFI_DroneCAN.h>
 #include <AP_GPS/AP_GPS_UAVCAN.h>
 #include <AP_BattMonitor/AP_BattMonitor_UAVCAN.h>
 #include <AP_Compass/AP_Compass_UAVCAN.h>
@@ -57,6 +58,7 @@
 #include <AP_ADSB/AP_ADSB.h>
 #include "AP_UAVCAN_DNA_Server.h"
 #include <AP_Logger/AP_Logger.h>
+#include <AP_Notify/AP_Notify.h>
 #include <AP_OpenDroneID/AP_OpenDroneID.h>
 #include "AP_UAVCAN_pool.h"
 
@@ -66,10 +68,18 @@ extern const AP_HAL::HAL& hal;
 
 // setup default pool size
 #ifndef UAVCAN_NODE_POOL_SIZE
+#if HAL_CANFD_SUPPORTED
+#define UAVCAN_NODE_POOL_SIZE 16384
+#else
 #define UAVCAN_NODE_POOL_SIZE 8192
 #endif
+#endif
 
+#if HAL_CANFD_SUPPORTED
+#define UAVCAN_STACK_SIZE     8192
+#else
 #define UAVCAN_STACK_SIZE     4096
+#endif
 
 #define debug_uavcan(level_debug, fmt, args...) do { AP::can().log_text(level_debug, "UAVCAN", fmt, ##args); } while (0)
 
@@ -90,14 +100,15 @@ const AP_Param::GroupInfo AP_UAVCAN::var_info[] = {
     // @Param: SRV_BM
     // @DisplayName: Output channels to be transmitted as servo over UAVCAN
     // @Description: Bitmask with one set for channel to be transmitted as a servo command over UAVCAN
-    // @Bitmask: 0: Servo 1, 1: Servo 2, 2: Servo 3, 3: Servo 4, 4: Servo 5, 5: Servo 6, 6: Servo 7, 7: Servo 8, 8: Servo 9, 9: Servo 10, 10: Servo 11, 11: Servo 12, 12: Servo 13, 13: Servo 14, 14: Servo 15
+    // @Bitmask: 0: Servo 1, 1: Servo 2, 2: Servo 3, 3: Servo 4, 4: Servo 5, 5: Servo 6, 6: Servo 7, 7: Servo 8, 8: Servo 9, 9: Servo 10, 10: Servo 11, 11: Servo 12, 12: Servo 13, 13: Servo 14, 14: Servo 15, 15: Servo 16, 16: Servo 17, 17: Servo 18, 18: Servo 19, 19: Servo 20, 20: Servo 21, 21: Servo 22, 22: Servo 23, 23: Servo 24, 24: Servo 25, 25: Servo 26, 26: Servo 27, 27: Servo 28, 28: Servo 29, 29: Servo 30, 30: Servo 31, 31: Servo 32
+
     // @User: Advanced
     AP_GROUPINFO("SRV_BM", 2, AP_UAVCAN, _servo_bm, 0),
 
     // @Param: ESC_BM
     // @DisplayName: Output channels to be transmitted as ESC over UAVCAN
     // @Description: Bitmask with one set for channel to be transmitted as a ESC command over UAVCAN
-    // @Bitmask: 0: ESC 1, 1: ESC 2, 2: ESC 3, 3: ESC 4, 4: ESC 5, 5: ESC 6, 6: ESC 7, 7: ESC 8, 8: ESC 9, 9: ESC 10, 10: ESC 11, 11: ESC 12, 12: ESC 13, 13: ESC 14, 14: ESC 15, 15: ESC 16
+    // @Bitmask: 0: ESC 1, 1: ESC 2, 2: ESC 3, 3: ESC 4, 4: ESC 5, 5: ESC 6, 6: ESC 7, 7: ESC 8, 8: ESC 9, 9: ESC 10, 10: ESC 11, 11: ESC 12, 12: ESC 13, 13: ESC 14, 14: ESC 15, 15: ESC 16, 16: ESC 17, 17: ESC 18, 18: ESC 19, 19: ESC 20, 20: ESC 21, 21: ESC 22, 22: ESC 23, 23: ESC 24, 24: ESC 25, 25: ESC 26, 26: ESC 27, 27: ESC 28, 28: ESC 29, 29: ESC 30, 30: ESC 31, 31: ESC 32
     // @User: Advanced
     AP_GROUPINFO("ESC_BM", 3, AP_UAVCAN, _esc_bm, 0),
 
@@ -112,7 +123,7 @@ const AP_Param::GroupInfo AP_UAVCAN::var_info[] = {
     // @Param: OPTION
     // @DisplayName: UAVCAN options
     // @Description: Option flags
-    // @Bitmask: 0:ClearDNADatabase,1:IgnoreDNANodeConflicts
+    // @Bitmask: 0:ClearDNADatabase,1:IgnoreDNANodeConflicts,2:EnableCanfd,3:IgnoreDNANodeUnhealthy
     // @User: Advanced
     AP_GROUPINFO("OPTION", 5, AP_UAVCAN, _options, 0),
     
@@ -299,14 +310,27 @@ void AP_UAVCAN::init(uint8_t driver_index, bool enable_filters)
         }
         _node->setHardwareVersion(hw_version);
     }
+
+#if UAVCAN_SUPPORT_CANFD
+    if (option_is_set(Options::CANFD_ENABLED)) {
+        _node->enableCanFd();
+    }
+#endif
+
     int start_res = _node->start();
     if (start_res < 0) {
         debug_uavcan(AP_CANManager::LOG_ERROR, "UAVCAN: node start problem, error %d\n\r", start_res);
         return;
     }
 
+    _dna_server = new AP_UAVCAN_DNA_Server(this, StorageAccess(StorageManager::StorageCANDNA));
+    if (_dna_server == nullptr) {
+        debug_uavcan(AP_CANManager::LOG_ERROR, "UAVCAN: couldn't allocate DNA server\n\r");
+        return;
+    }
+
     //Start Servers
-    if (!AP::uavcan_dna_server().init(this)) {
+    if (!_dna_server->init()) {
         debug_uavcan(AP_CANManager::LOG_ERROR, "UAVCAN: Failed to start DNA Server\n\r");
         return;
     }
@@ -315,13 +339,22 @@ void AP_UAVCAN::init(uint8_t driver_index, bool enable_filters)
     AP_UAVCAN_DNA_Server::subscribe_msgs(this);
     AP_GPS_UAVCAN::subscribe_msgs(this);
     AP_Compass_UAVCAN::subscribe_msgs(this);
+#if AP_BARO_UAVCAN_ENABLED
     AP_Baro_UAVCAN::subscribe_msgs(this);
+#endif
     AP_BattMonitor_UAVCAN::subscribe_msgs(this);
+#if AP_AIRSPEED_UAVCAN_ENABLED
     AP_Airspeed_UAVCAN::subscribe_msgs(this);
+#endif
 #if AP_OPTICALFLOW_HEREFLOW_ENABLED
     AP_OpticalFlow_HereFlow::subscribe_msgs(this);
 #endif
+#if AP_RANGEFINDER_UAVCAN_ENABLED
     AP_RangeFinder_UAVCAN::subscribe_msgs(this);
+#endif
+#if HAL_EFI_ENABLED
+    AP_EFI_DroneCAN::subscribe_msgs(this);
+#endif
 
     act_out_array[driver_index] = new uavcan::Publisher<uavcan::equipment::actuator::ArrayCommand>(*_node);
     act_out_array[driver_index]->setTxTimeout(uavcan::MonotonicDuration::fromMSec(2));
@@ -397,7 +430,7 @@ void AP_UAVCAN::init(uint8_t driver_index, bool enable_filters)
 
     snprintf(_thread_name, sizeof(_thread_name), "uavcan_%u", driver_index);
 
-    if (!hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&AP_UAVCAN::loop, void), _thread_name, 4096, AP_HAL::Scheduler::PRIORITY_CAN, 0)) {
+    if (!hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&AP_UAVCAN::loop, void), _thread_name, UAVCAN_STACK_SIZE, AP_HAL::Scheduler::PRIORITY_CAN, 0)) {
         _node->setModeOfflineAndPublish();
         debug_uavcan(AP_CANManager::LOG_ERROR, "UAVCAN: couldn't create thread\n\r");
         return;
@@ -457,6 +490,7 @@ void AP_UAVCAN::loop(void)
         notify_state_send();
         send_parameter_request();
         send_parameter_save_request();
+        _dna_server->verify_nodes();
 #if AP_OPENDRONEID_ENABLED
         AP::opendroneid().dronecan_send(this);
 #endif
@@ -494,11 +528,13 @@ void AP_UAVCAN::SRV_send_actuator(void)
             if (_SRV_conf[starting_servo].servo_pending && ((((uint32_t) 1) << starting_servo) & _servo_bm)) {
                 cmd.actuator_id = starting_servo + 1;
 
-                // TODO: other types
-                cmd.command_type = uavcan::equipment::actuator::Command::COMMAND_TYPE_UNITLESS;
-
-                // TODO: failsafe, safety
-                cmd.command_value = constrain_float(((float) _SRV_conf[starting_servo].pulse - 1000.0) / 500.0 - 1.0, -1.0, 1.0);
+                if (option_is_set(Options::USE_ACTUATOR_PWM)) {
+                    cmd.command_type = uavcan::equipment::actuator::Command::COMMAND_TYPE_PWM;
+                    cmd.command_value = _SRV_conf[starting_servo].pulse;
+                } else {
+                    cmd.command_type = uavcan::equipment::actuator::Command::COMMAND_TYPE_UNITLESS;
+                    cmd.command_value = constrain_float(((float) _SRV_conf[starting_servo].pulse - 1000.0) / 500.0 - 1.0, -1.0, 1.0);
+                }
 
                 msg.commands.push_back(cmd);
 
@@ -566,9 +602,9 @@ void AP_UAVCAN::SRV_push_servos()
 {
     WITH_SEMAPHORE(SRV_sem);
 
-    for (uint8_t i = 0; i < NUM_SERVO_CHANNELS; i++) {
+    for (uint8_t i = 0; i < UAVCAN_SRV_NUMBER; i++) {
         // Check if this channels has any function assigned
-        if (SRV_Channels::channel_function(i)) {
+        if (SRV_Channels::channel_function(i) >= SRV_Channel::k_none) {
             _SRV_conf[i].pulse = SRV_Channels::srv_channel(i)->get_output_pwm();
             _SRV_conf[i].esc_pending = true;
             _SRV_conf[i].servo_pending = true;
@@ -1172,6 +1208,13 @@ bool AP_UAVCAN::check_and_reset_option(Options option)
         _options.set_and_save(int16_t(_options.get() & ~uint16_t(option)));
     }
     return ret;
+}
+
+// handle prearm check
+bool AP_UAVCAN::prearm_check(char* fail_msg, uint8_t fail_msg_len) const
+{
+    // forward this to DNA_Server
+    return _dna_server->prearm_check(fail_msg, fail_msg_len);
 }
 
 #endif // HAL_NUM_CAN_IFACES

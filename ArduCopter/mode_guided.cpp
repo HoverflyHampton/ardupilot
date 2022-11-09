@@ -112,8 +112,6 @@ bool ModeGuided::allows_arming(AP_Arming::Method method) const
 // takeoff_alt_cm is interpreted as alt-above-home (in cm) or alt-above-terrain if a rangefinder is available
 bool ModeGuided::do_user_takeoff_start(float takeoff_alt_cm)
 {
-    guided_mode = SubMode::TakeOff;
-
     // calculate target altitude and frame (either alt-above-ekf-origin or alt-above-terrain)
     int32_t alt_target_cm;
     bool alt_target_terrain = false;
@@ -139,11 +137,13 @@ bool ModeGuided::do_user_takeoff_start(float takeoff_alt_cm)
         }
     }
 
+    guided_mode = SubMode::TakeOff;
+
     // initialise yaw
     auto_yaw.set_mode(AUTO_YAW_HOLD);
 
     // clear i term when we're taking off
-    set_throttle_takeoff();
+    pos_control->init_z_controller();
 
     // initialise alt for WP_NAVALT_MIN and set completion alt
     auto_takeoff_start(alt_target_cm, alt_target_terrain);
@@ -166,9 +166,10 @@ void ModeGuided::wp_control_start()
     // initialise wpnav to stopping point
     Vector3f stopping_point;
     wp_nav->get_wp_stopping_point(stopping_point);
-
-    // no need to check return status because terrain data is not used
-    wp_nav->set_wp_destination(stopping_point, false);
+    if (!wp_nav->set_wp_destination(stopping_point, false)) {
+        // this should never happen because terrain data is not used
+        INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
+    }
 
     // initialise yaw
     auto_yaw.set_mode_to_default(false);
@@ -283,6 +284,30 @@ bool ModeGuided::is_taking_off() const
     return guided_mode == SubMode::TakeOff && !takeoff_complete;
 }
 
+bool ModeGuided::set_speed_xy(float speed_xy_cms)
+{
+    // initialise horizontal speed, acceleration
+    pos_control->set_max_speed_accel_xy(speed_xy_cms, wp_nav->get_wp_acceleration());
+    pos_control->set_correction_speed_accel_xy(speed_xy_cms, wp_nav->get_wp_acceleration());
+    return true;
+}
+
+bool ModeGuided::set_speed_up(float speed_up_cms)
+{
+    // initialize vertical speeds and acceleration
+    pos_control->set_max_speed_accel_z(wp_nav->get_default_speed_down(), speed_up_cms, wp_nav->get_accel_z());
+    pos_control->set_correction_speed_accel_z(wp_nav->get_default_speed_down(), speed_up_cms, wp_nav->get_accel_z());
+    return true;
+}
+
+bool ModeGuided::set_speed_down(float speed_down_cms)
+{
+    // initialize vertical speeds and acceleration
+    pos_control->set_max_speed_accel_z(speed_down_cms, wp_nav->get_default_speed_up(), wp_nav->get_accel_z());
+    pos_control->set_correction_speed_accel_z(speed_down_cms, wp_nav->get_default_speed_up(), wp_nav->get_accel_z());
+    return true;
+}
+
 // initialise guided mode's angle controller
 void ModeGuided::angle_control_start()
 {
@@ -315,7 +340,7 @@ void ModeGuided::angle_control_start()
 // else return false if the waypoint is outside the fence
 bool ModeGuided::set_destination(const Vector3f& destination, bool use_yaw, float yaw_cd, bool use_yaw_rate, float yaw_rate_cds, bool relative_yaw, bool terrain_alt)
 {
-#if AC_FENCE == ENABLED
+#if AP_FENCE_ENABLED
     // reject destination if outside the fence
     const Location dest_loc(destination, terrain_alt ? Location::AltFrame::ABOVE_TERRAIN : Location::AltFrame::ABOVE_ORIGIN);
     if (!copter.fence.check_destination_within_fence(dest_loc)) {
@@ -407,7 +432,7 @@ bool ModeGuided::get_wp(Location& destination) const
 // or if the fence is enabled and guided waypoint is outside the fence
 bool ModeGuided::set_destination(const Location& dest_loc, bool use_yaw, float yaw_cd, bool use_yaw_rate, float yaw_rate_cds, bool relative_yaw)
 {
-#if AC_FENCE == ENABLED
+#if AP_FENCE_ENABLED
     // reject destination outside the fence.
     // Note: there is a danger that a target specified as a terrain altitude might not be checked if the conversion to alt-above-home fails
     if (!copter.fence.check_destination_within_fence(dest_loc)) {
@@ -550,7 +575,7 @@ bool ModeGuided::set_destination_posvel(const Vector3f& destination, const Vecto
 // set_destination_posvelaccel - set guided mode position, velocity and acceleration target
 bool ModeGuided::set_destination_posvelaccel(const Vector3f& destination, const Vector3f& velocity, const Vector3f& acceleration, bool use_yaw, float yaw_cd, bool use_yaw_rate, float yaw_rate_cds, bool relative_yaw)
 {
-#if AC_FENCE == ENABLED
+#if AP_FENCE_ENABLED
     // reject destination if outside the fence
     const Location dest_loc(destination, Location::AltFrame::ABOVE_ORIGIN);
     if (!copter.fence.check_destination_within_fence(dest_loc)) {
@@ -699,7 +724,7 @@ void ModeGuided::pos_control_run()
 
     float pos_offset_z_buffer = 0.0; // Vertical buffer size in m
     if (guided_pos_terrain_alt) {
-        pos_offset_z_buffer = MIN(copter.wp_nav->get_terrain_margin() * 100.0, 0.5 * fabsf(guided_pos_target_cm.z));
+        pos_offset_z_buffer = MIN(copter.wp_nav->get_terrain_margin() * 100.0, 0.5 * fabsF(guided_pos_target_cm.z));
     }
     pos_control->input_pos_xyz(guided_pos_target_cm, terr_offset, pos_offset_z_buffer);
 
@@ -1017,7 +1042,7 @@ void ModeGuided::angle_control_run()
         motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
         if (motors->get_spool_state() == AP_Motors::SpoolState::THROTTLE_UNLIMITED) {
             set_land_complete(false);
-            set_throttle_takeoff();
+            pos_control->init_z_controller();
         }
         return;
     }

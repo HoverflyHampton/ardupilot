@@ -66,7 +66,6 @@ const AP_Scheduler::Task Tracker::scheduler_tasks[] = {
     SCHED_TASK_CLASS(AP_InertialSensor, &tracker.ins,       periodic,       50,   50, 70),
     SCHED_TASK_CLASS(AP_Notify,         &tracker.notify,    update,         50,  100, 75),
     SCHED_TASK(one_second_loop,         1,   3900, 80),
-    SCHED_TASK_CLASS(Compass,          &tracker.compass,              cal_update, 50, 100, 85),
     SCHED_TASK(stats_update,            1,    200, 90),
 };
 
@@ -81,9 +80,6 @@ void Tracker::get_scheduler_tasks(const AP_Scheduler::Task *&tasks,
 
 void Tracker::one_second_loop()
 {
-    // make it possible to change orientation at runtime
-    ahrs.update_orientation();
-
     // sync MAVLink system ID
     mavlink_system.sysid = g.sysid_this_mav;
 

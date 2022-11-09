@@ -113,7 +113,7 @@ void Plane::navigate()
 float Plane::mode_auto_target_airspeed_cm()
 {
 #if HAL_QUADPLANE_ENABLED
-    if ((quadplane.options & QuadPlane::OPTION_MISSION_LAND_FW_APPROACH) &&
+    if (quadplane.landing_with_fixed_wing_spiral_approach() &&
         ((vtol_approach_s.approach_stage == Landing_ApproachStage::APPROACH_LINE) ||
          (vtol_approach_s.approach_stage == Landing_ApproachStage::VTOL_LANDING))) {
         const float land_airspeed = TECS_controller.get_land_airspeed();
@@ -365,7 +365,7 @@ void Plane::update_loiter(uint16_t radius)
 }
 
 /*
-  handle speed and height control in FBWB or CRUISE mode.
+  handle speed and height control in FBWB, CRUISE, and optionally, LOITER mode.
   In this mode the elevator is used to change target altitude. The
   throttle is used to change target airspeed or throttle
  */
@@ -380,7 +380,7 @@ void Plane::update_fbwb_speed_height(void)
 
         target_altitude.last_elev_check_us = now;
 
-        float elevator_input = channel_pitch->get_control_in() / 4500.0f;
+        float elevator_input = channel_pitch->get_control_in() * (1/4500.0);
 
         if (g.flybywire_elev_reverse) {
             elevator_input = -elevator_input;

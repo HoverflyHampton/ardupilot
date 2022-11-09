@@ -31,6 +31,9 @@ void Plane::adjust_altitude_target()
         control_mode == &mode_cruise) {
         return;
     }
+    if ((control_mode == &mode_loiter) && plane.stick_mixing_enabled() && (plane.g2.flight_options & FlightOptions::ENABLE_LOITER_ALT_CONTROL)) {
+       return;
+    }
 #if OFFBOARD_GUIDED == ENABLED
     if (control_mode == &mode_guided && ((guided_state.target_alt_time_ms != 0) || guided_state.target_alt > -0.001 )) { // target_alt now defaults to -1, and _time_ms defaults to zero.
         // offboard altitude demanded
@@ -177,7 +180,7 @@ float Plane::relative_ground_altitude(bool use_rangefinder_if_available)
 
 #if HAL_QUADPLANE_ENABLED
     if (quadplane.in_vtol_land_descent() &&
-        !(quadplane.options & QuadPlane::OPTION_MISSION_LAND_FW_APPROACH)) {
+        !quadplane.landing_with_fixed_wing_spiral_approach()) {
         // when doing a VTOL landing we can use the waypoint height as
         // ground height. We can't do this if using the
         // LAND_FW_APPROACH as that uses the wp height as the approach

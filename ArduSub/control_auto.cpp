@@ -162,10 +162,10 @@ void Sub::auto_wp_run()
 
     // call attitude controller
     if (auto_yaw_mode == AUTO_YAW_HOLD) {
-        // roll & pitch from waypoint controller, yaw rate from pilot
+        // roll & pitch & yaw rate from pilot
         attitude_control.input_euler_angle_roll_pitch_euler_rate_yaw(target_roll, target_pitch, target_yaw_rate);
     } else {
-        // roll, pitch from waypoint controller, yaw heading from auto_heading()
+        // roll, pitch from pilot, yaw heading from auto_heading()
         attitude_control.input_euler_angle_roll_pitch_yaw(target_roll, target_pitch, get_auto_heading(), true);
     }
 }
@@ -180,7 +180,7 @@ void Sub::auto_circle_movetoedge_start(const Location &circle_center, float radi
 
     // set circle radius
     if (!is_zero(radius_m)) {
-        circle_nav.set_radius(radius_m * 100.0f);
+        circle_nav.set_radius_cm(radius_m * 100.0f);
     }
 
     // check our distance from edge of circle
@@ -339,7 +339,7 @@ void Sub::auto_loiter_run()
     float target_roll, target_pitch;
     get_pilot_desired_lean_angles(channel_roll->get_control_in(), channel_pitch->get_control_in(), target_roll, target_pitch, aparm.angle_max);
 
-    // roll & pitch from waypoint controller, yaw rate from pilot
+    // roll & pitch & yaw rate from pilot
     attitude_control.input_euler_angle_roll_pitch_euler_rate_yaw(target_roll, target_pitch, target_yaw_rate);
 }
 

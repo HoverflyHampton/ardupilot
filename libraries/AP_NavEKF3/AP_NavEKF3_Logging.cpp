@@ -146,7 +146,8 @@ void NavEKF3_core::Log_Write_XKF4(uint64_t time_us) const
         velTimeout<<1 |
         hgtTimeout<<2 |
         magTimeout<<3 |
-        tasTimeout<<4;
+        tasTimeout<<4 |
+        dragTimeout<<5;
 
     nav_filter_status solutionStatus {};
     getVariances(velVar, posVar, hgtVar, magVar, tasVar, offset);
@@ -190,7 +191,7 @@ void NavEKF3_core::Log_Write_XKF5(uint64_t time_us) const
         FIX : (int16_t)(1000*flowInnov[0]),  // optical flow LOS rate vector innovations from the main nav filter
         FIY : (int16_t)(1000*flowInnov[1]),  // optical flow LOS rate vector innovations from the main nav filter
         AFI : (int16_t)(1000 * auxFlowObsInnov.length()),  // optical flow LOS rate innovation from terrain offset estimator
-        HAGL : (int16_t)(100*(terrainState - stateStruct.position.z)),    // height above ground level
+        HAGL : float_to_int16(100*(terrainState - stateStruct.position.z)),    // height above ground level
         offset : (int16_t)(100*terrainState),           // filter ground offset state error
         RI : (int16_t)(100*innovRng),                   // range finder innovations
         meaRng : (uint16_t)(100*rangeDataDelayed.rng),  // measured range
@@ -364,17 +365,28 @@ void NavEKF3::Log_Write()
 
 void NavEKF3_core::Log_Write(uint64_t time_us)
 {
+    const auto level = frontend->_log_level;
+    if (level == NavEKF3::LogLevel::NONE) {  // no logging from EK3_LOG_LEVEL param
+        return;
+    }
+    Log_Write_XKF4(time_us);
+    if (level == NavEKF3::LogLevel::XKF4) {  // only log XKF4 scaled innovations
+        return;
+    }
+    Log_Write_GSF(time_us);
+    if (level == NavEKF3::LogLevel::XKF4_GSF) {  // only log XKF4 scaled innovations and GSF, otherwise log everything
+        return;
+    }
     // note that several of these functions exit-early if they're not
     // attempting to log the primary core.
     Log_Write_XKF1(time_us);
     Log_Write_XKF2(time_us);
     Log_Write_XKF3(time_us);
-    Log_Write_XKF4(time_us);
     Log_Write_XKF5(time_us);
 
     Log_Write_XKFS(time_us);
     Log_Write_Quaternion(time_us);
-    Log_Write_GSF(time_us);
+
 
     // write range beacon fusion debug packet if the range value is non-zero
     Log_Write_Beacon(time_us);

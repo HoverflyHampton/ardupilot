@@ -33,6 +33,13 @@
 // used to mark a function that may be unused in some builds
 #define UNUSED_FUNCTION __attribute__((unused))
 
+// used to mark an attribute that may be unused in some builds
+#ifdef __clang__
+#define UNUSED_PRIVATE_MEMBER __attribute__((unused))
+#else
+#define UNUSED_PRIVATE_MEMBER
+#endif
+
 // this can be used to optimize individual functions
 #define OPTIMIZE(level) __attribute__((optimize(level)))
 
@@ -81,6 +88,7 @@
   bool. Bitnumber starts at 0 for the first bit
  */
 #define BIT_IS_SET(value, bitnumber) (((value) & (1U<<(bitnumber))) != 0)
+#define BIT_IS_SET_64(value, bitnumber) (((value) & (uint64_t(1U)<<(bitnumber))) != 0)
 
 // get high or low bytes from 2 byte integer
 #define LOWBYTE(i) ((uint8_t)(i))

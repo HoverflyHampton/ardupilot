@@ -128,7 +128,7 @@ public:
         k_param_rangefinder, // rangefinder object
         k_param_fs_ekf_thresh,
         k_param_terrain,
-        k_param_acro_rp_expo,
+        k_param_acro_rp_expo,           // deprecated - remove
         k_param_throttle_deadzone,
         k_param_optflow,
         k_param_dcmcheck_thresh,        // deprecated - remove
@@ -143,7 +143,7 @@ public:
         k_param_gpslock_limit,          // deprecated - remove
         k_param_geofence_limit,         // deprecated - remove
         k_param_altitude_limit,         // deprecated - remove
-        k_param_fence,
+        k_param_fence_old,              // only used for conversion
         k_param_gps_glitch,             // deprecated
         k_param_baro_glitch,            // 71 - deprecated
 
@@ -199,6 +199,7 @@ public:
         k_param_pos_control,
         k_param_circle_nav,
         k_param_loiter_nav,     // 105
+        k_param_custom_control,
 
         // 110: Telemetry control
         //
@@ -469,7 +470,6 @@ public:
 #if MODE_ACRO_ENABLED == ENABLED
     // Acro parameters
     AP_Int8                 acro_trainer;
-    AP_Float                acro_rp_expo;
 #endif
 
     // Note: keep initializers here in the same order as they are declared
@@ -539,8 +539,6 @@ public:
     // developer options
     AP_Int32 dev_options;
 
-    // acro exponent parameters
-    AP_Float acro_y_expo;
 #if MODE_ACRO_ENABLED == ENABLED
     AP_Float acro_thr_mid;
 #endif
@@ -627,6 +625,17 @@ public:
     void *mode_zigzag_ptr;
 #endif
 
+    // command model parameters
+#if MODE_ACRO_ENABLED == ENABLED || MODE_SPORT_ENABLED == ENABLED
+    AC_CommandModel command_model_acro_rp;
+#endif
+
+#if MODE_ACRO_ENABLED == ENABLED || MODE_DRIFT_ENABLED == ENABLED
+    AC_CommandModel command_model_acro_y;
+#endif
+
+    AC_CommandModel command_model_pilot;
+
 #if MODE_ACRO_ENABLED == ENABLED
     AP_Int8 acro_options;
 #endif
@@ -655,18 +664,15 @@ public:
     AP_Float guided_timeout;
 #endif
 
-#if MODE_ACRO_ENABLED == ENABLED || MODE_SPORT_ENABLED == ENABLED
-    // Acro parameters
-    AP_Float                acro_rp_rate;
-#endif
-
-#if MODE_ACRO_ENABLED == ENABLED || MODE_DRIFT_ENABLED == ENABLED
-    AP_Float                acro_y_rate;
-#endif
-
-    AP_Float                pilot_y_rate;
-    AP_Float                pilot_y_expo;
     AP_Int8                 surftrak_mode;
+    AP_Int8                 failsafe_dr_enable;
+    AP_Int16                failsafe_dr_timeout;
+
+    // ramp time of throttle during take-off
+    AP_Float takeoff_throttle_slew_time;
+#if HAL_WITH_ESC_TELEM && FRAME_CONFIG != HELI_FRAME
+    AP_Int16 takeoff_rpm_min;
+#endif
 };
 
 extern const AP_Param::Info        var_info[];

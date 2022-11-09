@@ -454,16 +454,6 @@ bool AP_MotorsUGV::output_test_pwm(motor_test_order motor_seq, float pwm)
 //  returns true if checks pass, false if they fail.  report should be true to send text messages to GCS
 bool AP_MotorsUGV::pre_arm_check(bool report) const
 {
-    // check if both regular and skid steering functions have been defined
-    if (SRV_Channels::function_assigned(SRV_Channel::k_throttleLeft) &&
-        SRV_Channels::function_assigned(SRV_Channel::k_throttleRight) &&
-        SRV_Channels::function_assigned(SRV_Channel::k_throttle) &&
-        SRV_Channels::function_assigned(SRV_Channel::k_steering)) {
-        if (report) {
-            gcs().send_text(MAV_SEVERITY_CRITICAL, "PreArm: regular AND skid steering configured");
-        }
-        return false;
-    }
     // check if only one of skid-steering output has been configured
     if (SRV_Channels::function_assigned(SRV_Channel::k_throttleLeft) != SRV_Channels::function_assigned(SRV_Channel::k_throttleRight)) {
         if (report) {
@@ -494,9 +484,9 @@ bool AP_MotorsUGV::pre_arm_check(bool report) const
 // sanity check parameters
 void AP_MotorsUGV::sanity_check_parameters()
 {
-    _throttle_min = constrain_int16(_throttle_min, 0, 20);
-    _throttle_max = constrain_int16(_throttle_max, 30, 100);
-    _vector_angle_max = constrain_float(_vector_angle_max, 0.0f, 90.0f);
+    _throttle_min.set(constrain_int16(_throttle_min, 0, 20));
+    _throttle_max.set(constrain_int16(_throttle_max, 30, 100));
+    _vector_angle_max.set(constrain_float(_vector_angle_max, 0.0f, 90.0f));
 }
 
 // setup pwm output type
@@ -636,7 +626,7 @@ void AP_MotorsUGV::output_regular(bool armed, float ground_speed, float steering
 
                 // normalise desired steering and throttle to ease calculations
                 float steering_norm = steering / 4500.0f;
-                const float throttle_norm = throttle / 100.0f;
+                const float throttle_norm = throttle * 0.01f;
 
                 // steering can never be more than throttle * tan(_vector_angle_max)
                 const float vector_angle_max_rad = radians(constrain_float(_vector_angle_max, 0.0f, 90.0f));
@@ -741,7 +731,7 @@ void AP_MotorsUGV::output_skid_steering(bool armed, float steering, float thrott
 
     // skid steering mixer
     float steering_scaled = steering / 4500.0f; // steering scaled -1 to +1
-    float throttle_scaled = throttle / 100.0f;  // throttle scaled -1 to +1
+    float throttle_scaled = throttle * 0.01f;  // throttle scaled -1 to +1
 
     // apply constraints
     steering_scaled = constrain_float(steering_scaled, -1.0f, 1.0f);
@@ -802,9 +792,9 @@ void AP_MotorsUGV::output_omni(bool armed, float steering, float throttle, float
         steering = constrain_float(steering, -4500.0f, 4500.0f);
 
         // scale throttle, steering and lateral inputs to -1 to 1
-        const float scaled_throttle = throttle / 100.0f;
+        const float scaled_throttle = throttle * 0.01f;
         const float scaled_steering = steering / 4500.0f;
-        const float scaled_lateral = lateral / 100.0f;
+        const float scaled_lateral = lateral * 0.01f;
 
         float thr_str_ltr_out[AP_MOTORS_NUM_MOTORS_MAX];
         float thr_str_ltr_max = 1;
@@ -958,9 +948,9 @@ float AP_MotorsUGV::get_scaled_throttle(float throttle) const
     // scale using throttle_min
     if (_throttle_min > 0) {
         if (is_negative(throttle)) {
-            throttle = -_throttle_min + (throttle * ((100.0f - _throttle_min) / 100.0f));
+            throttle = -_throttle_min + (throttle * ((100.0f - _throttle_min) * 0.01f));
         } else {
-            throttle = _throttle_min + (throttle * ((100.0f - _throttle_min) / 100.0f));
+            throttle = _throttle_min + (throttle * ((100.0f - _throttle_min) * 0.01f));
         }
     }
 
@@ -971,7 +961,7 @@ float AP_MotorsUGV::get_scaled_throttle(float throttle) const
 
     // calculate scaler
     const float sign = (throttle < 0.0f) ? -1.0f : 1.0f;
-    const float throttle_pct = constrain_float(throttle, -100.0f, 100.0f) / 100.0f;
+    const float throttle_pct = constrain_float(throttle, -100.0f, 100.0f) * 0.01f;
     return 100.0f * sign * ((_thrust_curve_expo - 1.0f) + safe_sqrt((1.0f - _thrust_curve_expo) * (1.0f - _thrust_curve_expo) + 4.0f * _thrust_curve_expo * fabsf(throttle_pct))) / (2.0f * _thrust_curve_expo);
 }
 

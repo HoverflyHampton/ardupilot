@@ -16,6 +16,7 @@
 #include "lua_scripts.h"
 #include <AP_HAL/AP_HAL.h>
 #include "AP_Scripting.h"
+#include <AP_Logger/AP_Logger.h>
 
 #include <AP_Scripting/lua_generated_bindings.h>
 
@@ -26,6 +27,7 @@ extern const AP_HAL::HAL& hal;
 bool lua_scripts::overtime;
 jmp_buf lua_scripts::panic_jmp;
 char *lua_scripts::error_msg_buf;
+HAL_Semaphore lua_scripts::error_msg_buf_sem;
 uint8_t lua_scripts::print_error_count;
 uint32_t lua_scripts::last_print_ms;
 
@@ -34,6 +36,10 @@ lua_scripts::lua_scripts(const AP_Int32 &vm_steps, const AP_Int32 &heap_size, co
       _debug_options(debug_options),
      terminal(_terminal) {
     _heap = hal.util->allocate_heap_memory(heap_size);
+}
+
+lua_scripts::~lua_scripts() {
+    free(_heap);
 }
 
 void lua_scripts::hook(lua_State *L, lua_Debug *ar) {
@@ -47,14 +53,19 @@ void lua_scripts::hook(lua_State *L, lua_Debug *ar) {
 }
 
 void lua_scripts::print_error(MAV_SEVERITY severity) {
+    error_msg_buf_sem.take_blocking();
     if (error_msg_buf == nullptr) {
+        error_msg_buf_sem.give();
         return;
     }
     last_print_ms = AP_HAL::millis();
     GCS_SEND_TEXT(severity, "Lua: %s", error_msg_buf);
+    error_msg_buf_sem.give();
 }
 
 void lua_scripts::set_and_print_new_error_message(MAV_SEVERITY severity, const char *fmt, ...) {
+    error_msg_buf_sem.take_blocking();
+
     // reset buffer and print count
     print_error_count = 0;
     if (error_msg_buf) {
@@ -68,7 +79,7 @@ void lua_scripts::set_and_print_new_error_message(MAV_SEVERITY severity, const c
     va_copy(arg_list_copy, arg_list);
 
     // dry run to work out the required length
-    int len = hal.util->vsnprintf(NULL, 0, fmt, arg_list_copy);
+    int len = hal.util->vsnprintf(nullptr, 0, fmt, arg_list_copy);
 
     // finished with copy
     va_end(arg_list_copy);
@@ -76,6 +87,7 @@ void lua_scripts::set_and_print_new_error_message(MAV_SEVERITY severity, const c
     if (len <= 0) {
         // nothing to print, something has gone wrong
         va_end(arg_list);
+        error_msg_buf_sem.give();
         return;
     }
 
@@ -84,6 +96,7 @@ void lua_scripts::set_and_print_new_error_message(MAV_SEVERITY severity, const c
     if (!error_msg_buf) {
         // allocation failed
         va_end(arg_list);
+        error_msg_buf_sem.give();
         return;
     }
 
@@ -92,7 +105,9 @@ void lua_scripts::set_and_print_new_error_message(MAV_SEVERITY severity, const c
     va_end(arg_list);
 
     // print to cosole and GCS
-    hal.console->printf("Lua: %s\n", error_msg_buf);
+    DEV_PRINTF("Lua: %s\n", error_msg_buf);
+
+    error_msg_buf_sem.give();
     print_error(severity);
 }
 
@@ -162,7 +177,6 @@ void lua_scripts::create_sandbox(lua_State *L) {
     lua_pushstring(L, "utf8");
     luaopen_utf8(L);
     lua_settable(L, -3);
-    load_lua_bindings(L);
     load_generated_sandbox(L);
 
 }
@@ -527,12 +541,26 @@ void lua_scripts::run(void) {
         // re-print the latest error message every 10 seconds 10 times
         const uint8_t error_prints = 10;
         if ((print_error_count < error_prints) && (AP_HAL::millis() - last_print_ms > 10000)) {
+            // note that we do not clear the buffer after we have finished printing, this allows it to be used for a pre-arm check
             print_error(MAV_SEVERITY_DEBUG);
             print_error_count++;
-            if ((print_error_count >= error_prints) && (error_msg_buf != nullptr)) {
-                hal.util->heap_realloc(_heap, error_msg_buf, 0);
-                error_msg_buf = nullptr;
-            }
         }
     }
+
+    // make sure all scripts have been removed
+    while (scripts != nullptr) {
+        remove_script(lua_state, scripts);
+    }
+
+    if (lua_state != nullptr) {
+        lua_close(lua_state); // shutdown the old state
+        lua_state = nullptr;
+    }
+
+    error_msg_buf_sem.take_blocking();
+    if (error_msg_buf != nullptr) {
+        hal.util->heap_realloc(_heap, error_msg_buf, 0);
+        error_msg_buf = nullptr;
+    }
+    error_msg_buf_sem.give();
 }

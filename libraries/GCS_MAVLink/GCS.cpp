@@ -7,8 +7,15 @@
 #include <AP_Scheduler/AP_Scheduler.h>
 #include <AP_Baro/AP_Baro.h>
 #include <AP_AHRS/AP_AHRS.h>
+#include <AP_Compass/AP_Compass.h>
 #include <AP_GPS/AP_GPS.h>
 #include <AP_Arming/AP_Arming.h>
+#include <AP_VisualOdom/AP_VisualOdom.h>
+#include <AP_Notify/AP_Notify.h>
+
+#include "MissionItemProtocol_Waypoints.h"
+#include "MissionItemProtocol_Rally.h"
+#include "MissionItemProtocol_Fence.h"
 
 extern const AP_HAL::HAL& hal;
 
@@ -31,7 +38,9 @@ void GCS::get_sensor_status_flags(uint32_t &present,
 
 MissionItemProtocol_Waypoints *GCS::_missionitemprotocol_waypoints;
 MissionItemProtocol_Rally *GCS::_missionitemprotocol_rally;
+#if AP_FENCE_ENABLED
 MissionItemProtocol_Fence *GCS::_missionitemprotocol_fence;
+#endif
 
 const MAV_MISSION_TYPE GCS_MAVLINK::supported_mission_types[] = {
     MAV_MISSION_TYPE_MISSION,
@@ -112,6 +121,17 @@ void GCS::send_named_float(const char *name, float value) const
     gcs().send_to_active_channels(MAVLINK_MSG_ID_NAMED_VALUE_FLOAT,
                                   (const char *)&packet);
 }
+
+#if HAL_HIGH_LATENCY2_ENABLED
+void GCS::enable_high_latency_connections(bool enabled)
+{
+    for (uint8_t i=0; i<num_gcs(); i++) {
+        GCS_MAVLINK &c = *chan(i);
+        c.high_latency_link_enabled = enabled && c.is_high_latency_link;
+    } 
+    gcs().send_text(MAV_SEVERITY_NOTICE, "High Latency %s", enabled ? "enabled" : "disabled");
+}
+#endif // HAL_HIGH_LATENCY2_ENABLED
 
 /*
   install an alternative protocol handler. This allows another
@@ -249,7 +269,7 @@ void GCS::update_sensor_status_flags()
     }
 #endif
 
-#if !defined(HAL_BUILD_AP_PERIPH)
+#if !defined(HAL_BUILD_AP_PERIPH) && AP_FENCE_ENABLED
     const AC_Fence *fence = AP::fence();
     if (fence != nullptr) {
         if (fence->sys_status_enabled()) {
@@ -330,7 +350,7 @@ bool GCS::out_of_time() const
     return true;
 }
 
-void gcs_out_of_space_to_send_count(mavlink_channel_t chan)
+void gcs_out_of_space_to_send(mavlink_channel_t chan)
 {
     gcs().chan(chan)->out_of_space_to_send();
 }

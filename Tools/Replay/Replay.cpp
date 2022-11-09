@@ -25,6 +25,7 @@
 #include <GCS_MAVLink/GCS_Dummy.h>
 #include <AP_Filesystem/AP_Filesystem.h>
 #include <AP_Filesystem/posix_compat.h>
+#include <AP_AdvancedFailsafe/AP_AdvancedFailsafe.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 #include <AP_HAL_Linux/Scheduler.h>
@@ -110,8 +111,10 @@ bool AP_AdvancedFailsafe::gcs_terminate(bool should_terminate, const char *reaso
 // dummy method to avoid linking AP_Avoidance
 // AP_Avoidance *AP::ap_avoidance() { return nullptr; }
 
+#if AP_LTM_TELEM_ENABLED
 // avoid building/linking LTM:
 void AP_LTM_Telem::init() {};
+#endif
 #if AP_DEVO_TELEM_ENABLED
 // avoid building/linking Devo:
 void AP_DEVO_Telem::init() {};

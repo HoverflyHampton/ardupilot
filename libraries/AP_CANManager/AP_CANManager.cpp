@@ -25,7 +25,6 @@
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <AP_UAVCAN/AP_UAVCAN.h>
 #include <AP_KDECAN/AP_KDECAN.h>
-#include <AP_ToshibaCAN/AP_ToshibaCAN.h>
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_PiccoloCAN/AP_PiccoloCAN.h>
 #include <AP_EFI/AP_EFI_NWPMU.h>
@@ -167,10 +166,10 @@ void AP_CANManager::init()
         // instead of a driver
         if (_slcan_interface.init_passthrough(i)) {
             // we have slcan bridge setup pass that on as can iface
-            can_initialised = hal.can[i]->init(_interfaces[i]._bitrate, AP_HAL::CANIface::NormalMode);
+            can_initialised = hal.can[i]->init(_interfaces[i]._bitrate, _interfaces[i]._fdbitrate*1000000, AP_HAL::CANIface::NormalMode);
             iface = &_slcan_interface;
         } else {
-            can_initialised = hal.can[i]->init(_interfaces[i]._bitrate, AP_HAL::CANIface::NormalMode);
+            can_initialised = hal.can[i]->init(_interfaces[i]._bitrate, _interfaces[i]._fdbitrate*1000000, AP_HAL::CANIface::NormalMode);
         }
 
         if (!can_initialised) {
@@ -215,13 +214,6 @@ void AP_CANManager::init()
 
             AP_Param::load_object_from_eeprom((AP_KDECAN*)_drivers[drv_num], AP_KDECAN::var_info);
 #endif
-        } else if (drv_type[drv_num] == Driver_Type_ToshibaCAN) {
-            _drivers[drv_num] = new AP_ToshibaCAN;
-
-            if (_drivers[drv_num] == nullptr) {
-                AP_BoardConfig::allocation_error("ToshibaCAN %d", drv_num + 1);
-                continue;
-            }
         } else if (drv_type[drv_num] == Driver_Type_PiccoloCAN) {
 #if HAL_PICCOLO_CAN_ENABLE
             _drivers[drv_num] = _drv_param[drv_num]._piccolocan = new AP_PiccoloCAN;
@@ -234,7 +226,7 @@ void AP_CANManager::init()
             AP_Param::load_object_from_eeprom((AP_PiccoloCAN*)_drivers[drv_num], AP_PiccoloCAN::var_info);
 #endif
         } else if (drv_type[drv_num] == Driver_Type_CANTester) {
-#if HAL_NUM_CAN_IFACES > 1 && !HAL_MINIMIZE_FEATURES
+#if HAL_NUM_CAN_IFACES > 1 && !HAL_MINIMIZE_FEATURES && HAL_ENABLE_CANTESTER
             _drivers[drv_num] = _drv_param[drv_num]._testcan = new CANTester;
 
             if (_drivers[drv_num] == nullptr) {
@@ -426,14 +418,29 @@ bool AP_CANManager::handle_can_forward(mavlink_channel_t chan, const mavlink_com
  */
 void AP_CANManager::handle_can_frame(const mavlink_message_t &msg) const
 {
-    mavlink_can_frame_t p;
-    mavlink_msg_can_frame_decode(&msg, &p);
-    if (p.bus >= HAL_NUM_CAN_IFACES || hal.can[p.bus] == nullptr) {
-        return;
-    }
     const uint16_t timeout_us = 2000;
-    AP_HAL::CANFrame frame{p.id, p.data, p.len};
-    hal.can[p.bus]->send(frame, AP_HAL::native_micros64() + timeout_us, AP_HAL::CANIface::IsMAVCAN);
+    switch (msg.msgid) {
+    case MAVLINK_MSG_ID_CAN_FRAME: {
+        mavlink_can_frame_t p;
+        mavlink_msg_can_frame_decode(&msg, &p);
+        if (p.bus >= HAL_NUM_CAN_IFACES || hal.can[p.bus] == nullptr) {
+            return;
+        }
+        AP_HAL::CANFrame frame{p.id, p.data, p.len};
+        hal.can[p.bus]->send(frame, AP_HAL::native_micros64() + timeout_us, AP_HAL::CANIface::IsMAVCAN);
+        break;
+    }
+    case MAVLINK_MSG_ID_CANFD_FRAME: {
+        mavlink_canfd_frame_t p;
+        mavlink_msg_canfd_frame_decode(&msg, &p);
+        if (p.bus >= HAL_NUM_CAN_IFACES || hal.can[p.bus] == nullptr) {
+            return;
+        }
+        AP_HAL::CANFrame frame{p.id, p.data, p.len, true};
+        hal.can[p.bus]->send(frame, AP_HAL::native_micros64() + timeout_us, AP_HAL::CANIface::IsMAVCAN);
+        break;
+    }
+    }
 }
 
 /*
@@ -527,7 +534,7 @@ void AP_CANManager::handle_can_filter_modify(const mavlink_message_t &msg)
 
 /*
   handler for CAN frames from the registered callback, sending frames
-  out as CAN_FRAME messages
+  out as CAN_FRAME or CANFD_FRAME messages
  */
 void AP_CANManager::can_frame_callback(uint8_t bus, const AP_HAL::CANFrame &frame)
 {
@@ -543,26 +550,34 @@ void AP_CANManager::can_frame_callback(uint8_t bus, const AP_HAL::CANFrame &fram
         can_forward.frame_counter = 0;
     }
     WITH_SEMAPHORE(comm_chan_lock(can_forward.chan));
-    if (HAVE_PAYLOAD_SPACE(can_forward.chan, CAN_FRAME)) {
-        if (can_forward.num_filter_ids != 0) {
-            // work out ID of this frame
-            uint16_t id = 0;
-            if ((frame.id&0xff) != 0) {
-                // not anonymous
-                if (frame.id & 0x80) {
-                    // service message
-                    id = uint8_t(frame.id>>16);
-                } else {
-                    // message frame
-                    id = uint16_t(frame.id>>8);
-                }
-            }
-            if (!bisect_search_uint16(can_forward.filter_ids, can_forward.num_filter_ids, id)) {
-                return;
+    if (can_forward.filter_ids != nullptr) {
+        // work out ID of this frame
+        uint16_t id = 0;
+        if ((frame.id&0xff) != 0) {
+            // not anonymous
+            if (frame.id & 0x80) {
+                // service message
+                id = uint8_t(frame.id>>16);
+            } else {
+                // message frame
+                id = uint16_t(frame.id>>8);
             }
         }
-        mavlink_msg_can_frame_send(can_forward.chan, can_forward.system_id, can_forward.component_id,
-                                   bus, frame.dlc, frame.id, const_cast<uint8_t*>(frame.data));
+        if (!bisect_search_uint16(can_forward.filter_ids, can_forward.num_filter_ids, id)) {
+            return;
+        }
+    }
+    const uint8_t data_len = AP_HAL::CANFrame::dlcToDataLength(frame.dlc);
+    if (frame.isCanFDFrame()) {
+        if (HAVE_PAYLOAD_SPACE(can_forward.chan, CANFD_FRAME)) {
+            mavlink_msg_canfd_frame_send(can_forward.chan, can_forward.system_id, can_forward.component_id,
+                                         bus, data_len, frame.id, const_cast<uint8_t*>(frame.data));
+        }
+    } else {
+        if (HAVE_PAYLOAD_SPACE(can_forward.chan, CAN_FRAME)) {
+            mavlink_msg_can_frame_send(can_forward.chan, can_forward.system_id, can_forward.component_id,
+                                       bus, data_len, frame.id, const_cast<uint8_t*>(frame.data));
+        }
     }
 }
 #endif // HAL_GCS_ENABLED

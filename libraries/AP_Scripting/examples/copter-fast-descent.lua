@@ -81,8 +81,8 @@ function update()
     -- activate_type 0: reset stage when disarmed or not in Guided mode
     if not arming:is_armed() or (vehicle:get_mode() ~= copter_guided_mode_num) then 
       stage = 0
-      if (update_user) then
-        gcs:send_text(0, "Fast Descent: waiting for Guided")
+      if (update_user and arming:is_armed()) then
+        gcs:send_text(6, "Fast Descent: waiting for Guided")
       end
       return update, interval_ms
     end
@@ -91,8 +91,8 @@ function update()
     auto_last_id, cmd, arg1, arg2 = vehicle:nav_script_time()
     if not arming:is_armed() or not auto_last_id then 
       stage = 0
-      if (update_user) then
-        gcs:send_text(0, "Fast Descent: waiting for NAV_SCRIPT_TIME")
+      if (update_user and arming:is_armed()) then
+        gcs:send_text(6, "Fast Descent: waiting for NAV_SCRIPT_TIME")
       end
       return update, interval_ms
     end
@@ -120,7 +120,7 @@ function update()
       speed_xy = 0
       speed_z = 0
       stage = stage + 1           -- advance to next stage
-      gcs:send_text(0, "Fast Descent: starting")
+      gcs:send_text(5, "Fast Descent: starting")
     end
   elseif (stage == 1) then        -- Stage1: descend
 
@@ -136,25 +136,28 @@ function update()
       speed_xy = math.max(speed_xy - (accel_xy * dt), 0)  -- decelerate horizontal speed to zero
       speed_z = math.max(speed_z - (accel_z * dt), 0)     -- decelerate vertical speed to zero
     else
-      -- determine if below slowdown point
-      local slowdown = false
-      local stopping_distance_z = 0.5 * speed_z_max:get() * speed_z_max:get() / accel_z
-      if (rel_pos_home_NED) then
-        if (-rel_pos_home_NED:z() <= alt_above_home_min:get() + stopping_distance_z) then
-          slowdown = true
-        end
+      -- calculate conversion between alt-above-home and alt-above-ekf-origin
+      local home_alt_above_origin = 0
+      local home = ahrs:get_home()
+      local ekf_origin = ahrs:get_origin()
+      if home and ekf_origin then
+        local dist_NED = home:get_distance_NED(ekf_origin)
+        home_alt_above_origin = dist_NED:z()
       end
 
-      if (slowdown) then
-        -- slow down vertical and then horizontal speed
-        speed_z = math.max(speed_z - (accel_z * dt), math.min(speed_z_slowdown, speed_z_max:get())) -- decelerate to 0.1m/s vertically
-        if speed_z <= speed_z_slowdown then
-          speed_xy = math.max(speed_xy - (accel_xy * dt), 0)
-        end
+      -- calculate target speeds
+      local target_dist_to_alt_min = -target_alt_D - home_alt_above_origin - alt_above_home_min:get()  -- alt target's distance to alt_min
+      if (target_dist_to_alt_min > 0) then
+        local speed_z_limit = speed_z_max:get()
+        speed_z_limit = math.min(speed_z_limit, math.sqrt(2.0 * target_dist_to_alt_min * accel_z))  -- limit speed so vehicle can stop at ALT_MIN
+        speed_z_limit = math.max(speed_z_limit, speed_z_slowdown) -- vertical speed should never be less than 0.1 m/s when above ALT_MIN
+        speed_z = math.min(speed_z + (accel_z * dt), speed_z_limit)
+
+        speed_xy = math.min(speed_xy + (accel_xy * dt), speed_xy_max:get()) -- accelerate horizontal speed to maximum
       else
-        -- normal speed
-        speed_xy = math.min(speed_xy + (accel_xy * dt), speed_xy_max:get())   -- accelerate horizontal speed to max
-        speed_z = math.min(speed_z + (accel_z * dt), speed_z_max:get())       -- accelerate to max descent rate
+        -- below alt min so decelerate target speeds to zero
+        speed_xy = math.max(speed_xy - (accel_xy * dt), 0)  -- decelerate horizontal speed to zero
+        speed_z = math.max(speed_z - (accel_z * dt), 0)     -- decelerate vertical speed to zero
       end
     end
 
@@ -205,22 +208,22 @@ function update()
     -- send targets to vehicle with yaw target
     vehicle:set_target_posvelaccel_NED(target_pos, target_vel, target_accel, true, target_yaw_deg, false, 0, false)
 
-    -- advance to stage 2 when below target altitude
+    -- advance to stage 2 when below target altitude and target speeds are zero
     if (rel_pos_home_NED) then 
-      if (-rel_pos_home_NED:z() <= alt_above_home_min:get()) then
+      if (-rel_pos_home_NED:z() <= alt_above_home_min:get() and (speed_xy==0) and (speed_z==0)) then
         stage = stage + 1
       end
       if (update_user) then
-        gcs:send_text(0, string.format("Fast Descent: alt:%d target:%d", math.floor(-rel_pos_home_NED:z()), math.floor(alt_above_home_min:get())))
+        gcs:send_text(5, string.format("Fast Descent: alt:%d target:%d", math.floor(-rel_pos_home_NED:z()), math.floor(alt_above_home_min:get())))
       end
     else
-      gcs:send_text(0, "Fast Descent: lost position estimate, aborting")
+      gcs:send_text(5, "Fast Descent: lost position estimate, aborting")
       stage = stage + 1
     end
 
   elseif (stage == 2) then  -- Stage2: done!
     stage = stage + 1
-    gcs:send_text(0, "Fast Descent: done!")
+    gcs:send_text(5, "Fast Descent: done!")
     if (activate_type:get() == 0) then
       -- if activated from Guided change to RTL mode
       vehicle:set_mode(copter_rtl_mode_num)
