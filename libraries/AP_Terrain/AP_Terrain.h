@@ -423,15 +423,6 @@ private:
     float reference_offset;
 
 
-    // reference position for terrain adjustment, set at arming
-    bool have_reference_loc;
-    Location reference_loc;
-
-    // calculated reference offset
-    bool have_reference_offset;
-    float reference_offset;
-
-
     // cache the last terrain height (AMSL) of the AHRS current
     // location. This is used for extrapolation when terrain data is
     // temporarily unavailable

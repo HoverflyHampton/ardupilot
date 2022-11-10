@@ -475,17 +475,6 @@ void AC_PosControl::soften_for_landing_xy()
     set_externally_limited_xy();
 }
 
-/// reduce response for landing
-void AC_PosControl::soften_for_landing_xy()
-{
-    // decay position error to zero
-    _pos_target.xy() += (_inav.get_position_xy_cm().topostype() - _pos_target.xy()) * (_dt / (_dt + POSCONTROL_RELAX_TC));
-
-    // Prevent I term build up in xy velocity controller.
-    // Note that this flag is reset on each loop in update_xy_controller()
-    set_externally_limited_xy();
-}
-
 /// init_xy_controller - initialise the position controller to the current position, velocity, acceleration and attitude.
 ///     This function is the default initialisation for any position control that provides position, velocity and acceleration.
 void AC_PosControl::init_xy_controller()

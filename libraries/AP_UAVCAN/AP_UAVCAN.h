@@ -273,7 +273,6 @@ private:
     AP_PoolAllocator *_allocator;
     AP_UAVCAN_DNA_Server *_dna_server;
 
-    AP_PoolAllocator *_allocator;
     uavcan::Node<0> *_node;
 
     uint8_t _driver_index;

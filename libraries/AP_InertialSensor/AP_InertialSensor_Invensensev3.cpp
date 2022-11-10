@@ -331,8 +331,6 @@ void AP_InertialSensor_Invensensev3::read_fifo()
 {
     bool need_reset = false;
     uint16_t n_samples;
-    const uint8_t reg_counth = (inv3_type == Invensensev3_Type::ICM42670)?INV3REG_70_FIFO_COUNTH:INV3REG_FIFO_COUNTH;
-    const uint8_t reg_data   = (inv3_type == Invensensev3_Type::ICM42670)?INV3REG_70_FIFO_DATA:INV3REG_FIFO_DATA;
 
     const uint8_t reg_counth = (inv3_type == Invensensev3_Type::ICM42670)?INV3REG_70_FIFO_COUNTH:INV3REG_FIFO_COUNTH;
     const uint8_t reg_data   = (inv3_type == Invensensev3_Type::ICM42670)?INV3REG_70_FIFO_DATA:INV3REG_FIFO_DATA;

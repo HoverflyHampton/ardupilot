@@ -436,10 +436,6 @@ public:
     bool pause() override;
     bool resume() override;
 
-    // pause continue in auto mode
-    bool pause() override;
-    bool resume() override;
-
     bool loiter_start();
     void rtl_start();
     void takeoff_start(const Location& dest_loc);

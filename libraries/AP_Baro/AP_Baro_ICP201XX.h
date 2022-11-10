@@ -83,5 +83,3 @@ private:
 };
 
 #endif  // AP_BARO_ICP201XX_ENABLED 
-
-#endif  // AP_BARO_ICP201XX_ENABLED 

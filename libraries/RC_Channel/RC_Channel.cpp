@@ -147,12 +147,7 @@ bool RC_Channel::update(void)
     } else {
         return false;
     }
-    //This feels like the wrong place to do this, but I want to be sure that both angle and range control outputs are fixed
-    if((ch_in == 0 || ch_in == 1) && 
-        (radio_in > radio_max.get() || radio_in < radio_min.get()))
-    {
-        radio_in = (radio_max.get() + radio_min.get()) / 2;
-    }
+    
 
     if (type_in == ControlType::RANGE) {
 
@@ -194,7 +189,16 @@ int16_t RC_Channel::pwm_to_angle_dz_trim(uint16_t _dead_zone, uint16_t _trim) co
     int16_t reverse_mul = (reversed?-1:1);
 
     // don't allow out of range values
-    int16_t r_in = constrain_int16(radio_in, radio_min.get(), radio_max.get());
+    int16_t r_in = 0;
+    if((ch_in == 0 || ch_in == 1) && 
+        (r_in > radio_max.get() || radio_in < radio_min.get()))
+    {
+        r_in = (radio_max.get() + radio_min.get()) / 2;
+    }
+    else{
+        r_in = constrain_int16(radio_in, radio_min.get(), radio_max.get());
+    }
+    r_in = constrain_int16(radio_in, radio_min.get(), radio_max.get());
 
     if (r_in > radio_trim_high && radio_max != radio_trim_high) {
         return reverse_mul * ((int32_t)high_in * (int32_t)(r_in - radio_trim_high)) / (int32_t)(radio_max  - radio_trim_high);
@@ -230,7 +234,18 @@ int16_t RC_Channel::pwm_to_angle() const
  */
 int16_t RC_Channel::pwm_to_range_dz(uint16_t _dead_zone) const
 {
-    int16_t r_in = constrain_int16(radio_in, radio_min.get(), radio_max.get());
+    //This feels like the wrong place to do this, but I want to be sure that both angle and range control outputs are fixed
+    
+    int16_t r_in = 0;
+    if((ch_in == 0 || ch_in == 1) && 
+        (r_in > radio_max.get() || radio_in < radio_min.get()))
+    {
+        r_in = (radio_max.get() + radio_min.get()) / 2;
+    }
+    else{
+        r_in = constrain_int16(radio_in, radio_min.get(), radio_max.get());
+    }
+     
 
     if (reversed) {
 	    r_in = radio_max.get() - (r_in - radio_min.get());
