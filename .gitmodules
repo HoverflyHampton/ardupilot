@@ -6,7 +6,6 @@
 	url = https://github.com/ArduPilot/waf.git
 [submodule "modules/gbenchmark"]
 	path = modules/gbenchmark
-	branch = main
 	url = https://github.com/google/benchmark.git
 [submodule "modules/mavlink"]
 	path = modules/mavlink
