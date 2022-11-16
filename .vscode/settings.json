@@ -1,4 +1,11 @@
 {
     "cSpell.language": "en-GB",
-    "astyle.astylerc": "${workspaceFolder}/Tools/CodeStyle/astylerc"
+    "astyle.astylerc": "${workspaceFolder}/Tools/CodeStyle/astylerc",
+    "files.associations": {
+        "*.tcc": "cpp",
+        "bitset": "cpp",
+        "cstdlib": "cpp",
+        "shared_mutex": "cpp",
+        "regex": "cpp"
+    }
 }

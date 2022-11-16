@@ -23,6 +23,7 @@ struct PACKED log_BARO {
     uint8_t instance;
     float   altitude;
     float   pressure;
+    float   ground_pressure;
     int16_t temperature;
     float   climbrate;
     uint32_t sample_time_ms;
@@ -34,9 +35,9 @@ struct PACKED log_BARO {
 #define LOG_STRUCTURE_FROM_BARO                                         \
     { LOG_BARO_MSG, sizeof(log_BARO),                                   \
             "BARO",                                                     \
-            "Q"       "B"  "f"    "f"      "c"     "f"    "I"    "f"       "f"        "B", \
-            "TimeUS," "I," "Alt," "Press," "Temp," "CRt," "SMS," "Offset," "GndTemp," "Health", \
-            "s"       "#"  "m"    "P"      "O"     "n"    "s"    "m"       "O"        "-", \
-            "F"       "-"  "0"    "0"      "B"     "0"    "C"    "?"       "0"        "-", \
+            "Q"       "B"  "f"    "f"      "f"         "c"     "f"    "I"    "f"       "f"        "B", \
+            "TimeUS," "I," "Alt," "Press," "GndPress," "Temp," "CRt," "SMS," "Offset," "GndTemp," "Health", \
+            "s"       "#"  "m"    "P"      "P"         "O"     "n"    "s"    "m"       "O"        "-", \
+            "F"       "-"  "0"    "0"      "0"         "B"     "0"    "C"    "?"       "0"        "-", \
             true                                                        \
             },

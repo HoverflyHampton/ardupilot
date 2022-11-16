@@ -184,6 +184,14 @@ const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO_FRAME("ORIENT", 18, AC_PrecLand, _orient, AC_PRECLAND_ORIENT_DEFAULT, AP_PARAM_FRAME_ROVER),
 
+    // @Param: OUTLIER
+    // @DisplayName: Maximum Outlier value
+    // @Description: The maxiumum value of an outlier in ekf data when landing
+    // @Values: (1, 1000)
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("OUTLIER", 19, AC_PrecLand, _max_outlier_reject_value, 3.0f),
+
     AP_GROUPEND
 };
 
@@ -551,7 +559,7 @@ void AC_PrecLand::run_estimator(float rangefinder_alt_m, bool rangefinder_alt_va
                 } else {
                     float NIS_x = _ekf_x.getPosNIS(_target_pos_rel_meas_NED.x, xy_pos_var);
                     float NIS_y = _ekf_y.getPosNIS(_target_pos_rel_meas_NED.y, xy_pos_var);
-                    if (MAX(NIS_x, NIS_y) < 3.0f || _outlier_reject_count >= 3) {
+                    if (MAX(NIS_x, NIS_y) < _max_outlier_reject_value || _outlier_reject_count >= 3) {
                         _outlier_reject_count = 0;
                         _ekf_x.fusePos(_target_pos_rel_meas_NED.x, xy_pos_var);
                         _ekf_y.fusePos(_target_pos_rel_meas_NED.y, xy_pos_var);
