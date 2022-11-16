@@ -1,6 +1,3 @@
-[submodule "modules/uavcan"]
-	path = modules/uavcan
-	url = https://github.com/DroneCAN/libuavcan.git
 [submodule "modules/waf"]
 	path = modules/waf
 	url = https://github.com/ArduPilot/waf.git
@@ -10,7 +7,7 @@
 [submodule "modules/mavlink"]
 	path = modules/mavlink
 	url = https://github.com/ArduPilot/mavlink
-[submodule "gtest"]
+[submodule "modules/gtest"]
 	path = modules/gtest
 	url = https://github.com/ArduPilot/googletest
 [submodule "modules/ChibiOS"]
@@ -34,3 +31,6 @@
 [submodule "modules/DroneCAN/libcanard"]
 	path = modules/DroneCAN/libcanard
 	url = https://github.com/DroneCAN/libcanard
+[submodule "modules/uavcan"]
+	path = modules/uavcan
+	url = https://github.com/DroneCAN/libuavcan.git
