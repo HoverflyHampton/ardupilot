@@ -16,9 +16,6 @@ define HAL_STORAGE_SIZE 800
 STM32_ST_USE_TIMER 15
 define CH_CFG_ST_RESOLUTION 16
 
-# enable watchdog
-define HAL_WATCHDOG_ENABLED_DEFAULT true
-
 # board ID for firmware load
 APJ_BOARD_ID 1050
 

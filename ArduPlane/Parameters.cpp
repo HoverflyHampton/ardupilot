@@ -1502,48 +1502,12 @@ void Plane::load_parameters(void)
         const uint16_t old_top_element = 0; // Old group element in the tree for the first subgroup element (see AP_PARAM_KEY_DUMP)
         AP_Param::convert_class(old_key, &airspeed, airspeed.var_info, old_index, old_top_element, true);
     }
-#endif
-
-#if HAL_INS_NUM_HARMONIC_NOTCH_FILTERS > 1
-    if (!ins.harmonic_notches[1].params.enabled()) {
-        // notch filter parameter conversions (moved to INS_HNTC2) for 4.2.x, converted from fixed notch
-        const AP_Param::ConversionInfo notchfilt_conversion_info[] {
-            { Parameters::k_param_ins, 101, AP_PARAM_INT8,  "INS_HNTC2_ENABLE" },
-            { Parameters::k_param_ins, 293, AP_PARAM_FLOAT, "INS_HNTC2_ATT" },
-            { Parameters::k_param_ins, 357, AP_PARAM_FLOAT, "INS_HNTC2_FREQ" },
-            { Parameters::k_param_ins, 421, AP_PARAM_FLOAT, "INS_HNTC2_BW" },
-        };
-        uint8_t notchfilt_table_size = ARRAY_SIZE(notchfilt_conversion_info);
-        for (uint8_t i=0; i<notchfilt_table_size; i++) {
-            AP_Param::convert_old_parameters(&notchfilt_conversion_info[i], 1.0f);
-        }
-        AP_Param::set_default_by_name("INS_HNTC2_MODE", 0);
-        AP_Param::set_default_by_name("INS_HNTC2_HMNCS", 1);
-    }
-#endif // HAL_INS_NUM_HARMONIC_NOTCH_FILTERS
-    
+#endif    
     // PARAMETER_CONVERSION - Added: Mar-2022
 #if AP_FENCE_ENABLED
     AP_Param::convert_class(g.k_param_fence, &fence, fence.var_info, 0, 0, true);
 #endif
 
-#if HAL_INS_NUM_HARMONIC_NOTCH_FILTERS > 1
-    if (!ins.harmonic_notches[1].params.enabled()) {
-        // notch filter parameter conversions (moved to INS_HNTC2) for 4.2.x, converted from fixed notch
-        const AP_Param::ConversionInfo notchfilt_conversion_info[] {
-            { Parameters::k_param_ins, 101, AP_PARAM_INT8,  "INS_HNTC2_ENABLE" },
-            { Parameters::k_param_ins, 293, AP_PARAM_FLOAT, "INS_HNTC2_ATT" },
-            { Parameters::k_param_ins, 357, AP_PARAM_FLOAT, "INS_HNTC2_FREQ" },
-            { Parameters::k_param_ins, 421, AP_PARAM_FLOAT, "INS_HNTC2_BW" },
-        };
-        uint8_t notchfilt_table_size = ARRAY_SIZE(notchfilt_conversion_info);
-        for (uint8_t i=0; i<notchfilt_table_size; i++) {
-            AP_Param::convert_old_parameters(&notchfilt_conversion_info[i], 1.0f);
-        }
-        AP_Param::set_default_by_name("INS_HNTC2_MODE", 0);
-        AP_Param::set_default_by_name("INS_HNTC2_HMNCS", 1);
-    }
-#endif // HAL_INS_NUM_HARMONIC_NOTCH_FILTERS
     
     hal.console->printf("load_all took %uus\n", (unsigned)(micros() - before));
 }

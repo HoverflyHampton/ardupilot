@@ -7,7 +7,7 @@
 [submodule "modules/mavlink"]
 	path = modules/mavlink
 	url = https://github.com/ArduPilot/mavlink
-[submodule "modules/gtest"]
+[submodule "gtest"]
 	path = modules/gtest
 	url = https://github.com/ArduPilot/googletest
 [submodule "modules/ChibiOS"]
