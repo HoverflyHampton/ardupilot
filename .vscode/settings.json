@@ -6,6 +6,12 @@
         "bitset": "cpp",
         "cstdlib": "cpp",
         "shared_mutex": "cpp",
-        "regex": "cpp"
+        "regex": "cpp",
+        "fstream": "cpp",
+        "iosfwd": "cpp",
+        "istream": "cpp",
+        "limits": "cpp",
+        "sstream": "cpp",
+        "streambuf": "cpp"
     }
 }

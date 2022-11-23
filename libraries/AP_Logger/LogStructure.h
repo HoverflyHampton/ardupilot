@@ -440,6 +440,15 @@ struct PACKED log_MAG {
     uint32_t SUS;
 };
 
+struct PACKED log_MGST{
+  LOG_PACKET_HEADER;
+  uint64_t time_us;
+  uint8_t  id;
+  int16_t mag_x;
+  int16_t mag_y;
+  int16_t mag_z;
+};
+
 struct PACKED log_Mode {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -1249,6 +1258,8 @@ LOG_STRUCTURE_FROM_CAMERA \
     LOG_STRUCTURE_FROM_BATTMONITOR \
     { LOG_MAG_MSG, sizeof(log_MAG), \
       "MAG", "QBhhhhhhhhhBI",    "TimeUS,I,MagX,MagY,MagZ,OfsX,OfsY,OfsZ,MOX,MOY,MOZ,Health,S", "s#GGGGGGGGG-s", "F-CCCCCCCCC-F", true }, \
+    {LOG_MGST_MSG, sizeof(log_MGST), \
+      "MGST", "QBhhh", "TimeUS,ID,MagX,MagY,MagZ", "s#GGG", "F-CCC"},\
     { LOG_MODE_MSG, sizeof(log_Mode), \
       "MODE", "QMBB",         "TimeUS,Mode,ModeNum,Rsn", "s---", "F---" }, \
     { LOG_RFND_MSG, sizeof(log_RFND), \
@@ -1371,6 +1382,7 @@ enum LogMessages : uint8_t {
     LOG_PIDE_MSG,
     LOG_DSTL_MSG,
     LOG_MAG_MSG,
+    LOG_MGST_MSG,
     LOG_ARSP_MSG,
     LOG_IDS_FROM_RPM,
     LOG_RFND_MSG,

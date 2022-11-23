@@ -411,7 +411,18 @@ void AP_Logger::Write_Compass_instance(const uint64_t time_us, const uint8_t mag
     };
     WriteBlock(&pkt, sizeof(pkt));
 }
-
+void AP_Logger::Write_Compass_self_test(const uint8_t id, float mag_x, float mag_y, float mag_z)
+{
+    const struct log_MGST pkt{
+        LOG_PACKET_HEADER_INIT(LOG_MGST_MSG),
+        time_us: AP_HAL::micros64(),
+        id : id,
+        mag_x  : (int16_t) mag_x,
+        mag_y  : (int16_t) mag_y,
+        mag_z  : (int16_t) mag_z
+    };
+    WriteBlock(&pkt, sizeof(pkt));
+}
 // Write a Compass packet
 void AP_Logger::Write_Compass()
 {

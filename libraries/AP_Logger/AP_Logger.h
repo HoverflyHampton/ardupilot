@@ -310,6 +310,7 @@ public:
     void Write_MessageF(const char *fmt, ...);
     void Write_ServoStatus(uint64_t time_us, uint8_t id, float position, float force, float speed, uint8_t power_pct);
     void Write_Compass();
+    void Write_Compass_self_test(const uint8_t id, float mag_x, float mag_y, float mag_z);
     void Write_Mode(uint8_t mode, const ModeReason reason);
 
     void Write_EntireMission();
@@ -500,6 +501,8 @@ private:
     bool should_log_rcin2;
 
     void Write_Compass_instance(uint64_t time_us, uint8_t mag_instance);
+
+    
 
     void backend_starting_new_log(const AP_Logger_Backend *backend);
 

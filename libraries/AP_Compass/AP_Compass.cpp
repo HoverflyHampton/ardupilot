@@ -1108,10 +1108,10 @@ void Compass::_probe_external_i2c_compasses(void)
     FOREACH_I2C_INTERNAL(i) {
         ADD_BACKEND(DRIVER_ICM20948, AP_Compass_AK09916::probe_ICM20948(GET_I2C_DEVICE(i, HAL_COMPASS_AK09916_I2C_ADDR),
                     GET_I2C_DEVICE(i, HAL_COMPASS_ICM20948_I2C_ADDR),
-                    all_external, ROTATION_PITCH_180_YAW_90));
+                    all_external, ROTATION_PITCH_180_YAW_90, true));
         ADD_BACKEND(DRIVER_ICM20948, AP_Compass_AK09916::probe_ICM20948(GET_I2C_DEVICE(i, HAL_COMPASS_AK09916_I2C_ADDR),
                     GET_I2C_DEVICE(i, HAL_COMPASS_ICM20948_I2C_ADDR2),
-                    all_external, ROTATION_PITCH_180_YAW_90));
+                    all_external, ROTATION_PITCH_180_YAW_90, true));
     }
 #endif // HAL_BUILD_AP_PERIPH
 

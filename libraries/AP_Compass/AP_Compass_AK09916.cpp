@@ -25,6 +25,7 @@
 #include <AP_InertialSensor/AP_InertialSensor_Invensensev2.h>
 #include <GCS_MAVLink/GCS.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
+#include <AP_Logger/AP_Logger.h>
 
 extern const AP_HAL::HAL &hal;
 
@@ -65,10 +66,12 @@ struct PACKED sample_regs {
 
 AP_Compass_AK09916::AP_Compass_AK09916(AP_AK09916_BusDriver *bus,
                                         bool force_external,
-                                        enum Rotation rotation)
+                                        enum Rotation rotation,
+                                        bool use_self_test)
     : _bus(bus)
     , _force_external(force_external)
     , _rotation(rotation)
+    , _use_self_test(use_self_test)
 {
 }
 
@@ -79,7 +82,8 @@ AP_Compass_AK09916::~AP_Compass_AK09916()
 
 AP_Compass_Backend *AP_Compass_AK09916::probe(AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev,
                                              bool force_external,
-                                             enum Rotation rotation)
+                                             enum Rotation rotation,
+                                             bool use_self_test)
 {
     if (!dev) {
         return nullptr;
@@ -89,7 +93,7 @@ AP_Compass_Backend *AP_Compass_AK09916::probe(AP_HAL::OwnPtr<AP_HAL::I2CDevice> 
         return nullptr;
     }
 
-    AP_Compass_AK09916 *sensor = new AP_Compass_AK09916(bus, force_external, rotation);
+    AP_Compass_AK09916 *sensor = new AP_Compass_AK09916(bus, force_external, rotation, use_self_test);
     if (!sensor || !sensor->init()) {
         delete sensor;
         return nullptr;
@@ -101,14 +105,12 @@ AP_Compass_Backend *AP_Compass_AK09916::probe(AP_HAL::OwnPtr<AP_HAL::I2CDevice> 
 AP_Compass_Backend *AP_Compass_AK09916::probe_ICM20948(AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev,
                                                      AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev_icm,
                                                      bool force_external,
-                                                     enum Rotation rotation)
-{
+                                                     enum Rotation rotation, bool use_self_test){
     if (!dev || !dev_icm) {
         return nullptr;
     }
 
     dev->get_semaphore()->take_blocking();
-
     /* Allow ICM20x48 to shortcut auxiliary bus and host bus */
     uint8_t rval;
     uint16_t whoami;
@@ -163,7 +165,7 @@ AP_Compass_Backend *AP_Compass_AK09916::probe_ICM20948(AP_HAL::OwnPtr<AP_HAL::I2
     dev_icm->write_register(REG_ICM_INT_PIN_CFG, 0x02);
     hal.scheduler->delay(1);
     dev->get_semaphore()->give();
-    return probe(std::move(dev), force_external, rotation);
+    return probe(std::move(dev), force_external, rotation, use_self_test);
 fail:
     dev->get_semaphore()->give();
     return nullptr;
@@ -325,9 +327,39 @@ void AP_Compass_AK09916::_update()
     raw_field *= AK09916_MILLIGAUSS_SCALE;
 
     accumulate_sample(raw_field, _compass_instance, 10);
+    if(_use_self_test && _update_count++ > HAL_COMPASS_ICM20948_SELF_TEST_FREQ)
+    {
+        _update_count = 0;
+        _self_test();
+    }
 
 check_registers:
     _bus->check_next_register();
+}
+
+void AP_Compass_AK09916::_self_test()
+{
+    struct sample_regs regs = {0};
+    Vector3f raw_field;
+    //set to power down mode to prepare for check
+    _bus->register_write(REG_CNTL2, 0x00, true); //Power down mode
+    //set self test mode
+    _bus->register_write(REG_CNTL2, 0x10, true); //self text mode
+    while(true)
+    {
+        _bus->block_read(REG_ST1, (uint8_t *) &regs, sizeof(regs));
+        if (regs.st1 & 0x01) { //check for data ready
+            break;
+        }
+    }
+    raw_field = Vector3f(regs.val[0], regs.val[1], regs.val[2]);
+
+    // log stuff here
+    AP::logger().Write_Compass_self_test(_compass_instance, raw_field[0], raw_field[1], raw_field[2]);
+    //reset for continous update
+    _reset();
+    _setup_mode();
+
 }
 
 bool AP_Compass_AK09916::_check_id()

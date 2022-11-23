@@ -628,6 +628,14 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
 
     // 59 was GSF_DELAY which was never released in a stable version
 
+    // @Param: MAG_RST_ALT
+    // @DisplayName: Magnetometer Reset Altitude
+    // @Description: Specifies the altitude for the final reset of the magnetometer fusion
+    // @Range: 0 200
+    // @Units: m
+    // @User: Advanced
+    AP_GROUPINFO("MAG_RST_ALT", 59, NavEKF3, _mag_final_reset_alt, EKF3_MAG_FINAL_RESET_ALT_DEFAULT),
+
     // @Param: GSF_RST_MAX
     // @DisplayName: Maximum number of resets to the EKF-GSF yaw estimate allowed
     // @Description: Sets the maximum number of times the EKF3 will be allowed to reset its yaw to the estimate from the EKF-GSF yaw estimator. No resets will be allowed unless the use of the EKF-GSF yaw estimate is enabled via the EK3_GSF_USE_MASK parameter.
@@ -656,13 +664,7 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
 
     AP_SUBGROUPEXTENSION("", 63, NavEKF3, var_info2),
 
-    // @Param: MAG_RST_ALT
-    // @DisplayName: Magnetometer Reset Altitude
-    // @Description: Specifies the altitude for the final reset of the magnetometer fusion
-    // @Range: 0 200
-    // @Units: m
-    // @User: Advanced
-    AP_GROUPINFO("MAG_RST_ALT", 64, NavEKF3, _mag_final_reset_alt, EKF3_MAG_FINAL_RESET_ALT_DEFAULT),
+    
 
     AP_GROUPEND
 };

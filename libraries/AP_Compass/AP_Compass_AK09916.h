@@ -35,6 +35,10 @@
 # define HAL_COMPASS_ICM20948_I2C_ADDR2 0x68
 #endif
 
+#ifndef HAL_COMPASS_ICM20948_SELF_TEST_FREQ
+# define HAL_COMPASS_ICM20948_SELF_TEST_FREQ 500
+#endif
+
 class AuxiliaryBus;
 class AuxiliaryBusSlave;
 class AP_InertialSensor;
@@ -46,13 +50,15 @@ public:
     /* Probe for AK09916 standalone on I2C bus */
     static AP_Compass_Backend *probe(AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev,
                                      bool force_external,
-                                     enum Rotation rotation);
+                                     enum Rotation rotation,
+                                     bool use_self_test = false);
 
     /* Probe for AK09916 on auxiliary bus of ICM20948, connected through I2C */
     static AP_Compass_Backend *probe_ICM20948(AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev,
                                              AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev_icm,
                                              bool force_external,
-                                             enum Rotation rotation);
+                                             enum Rotation rotation,
+                                             bool use_self_test = false);
 
     /* Probe for AK09916 on auxiliary bus of ICM20948, connected through SPI by default */
     static AP_Compass_Backend *probe_ICM20948(uint8_t mpu9250_instance, enum Rotation rotation);
@@ -71,7 +77,7 @@ public:
 
 private:
     AP_Compass_AK09916(AP_AK09916_BusDriver *bus, bool force_external,
-                       enum Rotation rotation);
+                       enum Rotation rotation, bool use_self_test = false);
 
     bool init();
     void _make_factory_sensitivity_adjustment(Vector3f &field) const;
@@ -84,6 +90,8 @@ private:
 
     void _update();
 
+    void _self_test();
+
     AP_AK09916_BusDriver *_bus;
 
     bool _force_external;
@@ -91,6 +99,8 @@ private:
     bool _initialized;
     enum Rotation _rotation;
     enum AP_Compass_Backend::DevTypes _devtype;
+    bool _use_self_test;
+    uint16_t _update_count;
 };
 
 
