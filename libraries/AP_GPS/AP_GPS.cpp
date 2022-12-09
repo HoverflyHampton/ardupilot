@@ -857,6 +857,7 @@ void AP_GPS::update_primary(void)
     if (_output_is_blended) {
         // Use the weighting to calculate blended GPS states
         calc_blended_state();
+        
         // set primary to the virtual instance
         primary_instance = GPS_BLENDED_INSTANCE;
         return;
@@ -959,11 +960,7 @@ void AP_GPS::update_primary(void)
             }
         }
     }
-    // Log the blended gps
-    if (should_log() || AP::ahrs().have_ekf_logging())
-    {
-        AP::logger().Write_GPS(GPS_MAX_RECEIVERS);
-    }
+    
 #endif // GPS_BLENDED_INSTANCE
 }
 
@@ -1733,6 +1730,12 @@ void AP_GPS::calc_blended_state(void)
     }
     timing[GPS_BLENDED_INSTANCE].last_fix_time_ms = (uint32_t)temp_time_1;
     timing[GPS_BLENDED_INSTANCE].last_message_time_ms = (uint32_t)temp_time_2;
+
+    // Log the blended gps
+    if (should_log() || AP::ahrs().have_ekf_logging())
+    {
+        AP::logger().Write_GPS(GPS_BLENDED_INSTANCE);
+    }
 }
 #endif // GPS_BLENDED_INSTANCE
 
