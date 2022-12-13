@@ -184,6 +184,11 @@ const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO_FRAME("ORIENT", 18, AC_PrecLand, _orient, AC_PRECLAND_ORIENT_DEFAULT, AP_PARAM_FRAME_ROVER),
 
+    // @Param: OUTLIER
+    // @DisplayName: Outlier Max Reject Value
+    // @Description: The Maximum value of an outlier before rejection
+    // @User: Advanced
+    AP_GROUPINFO("OUTLIER", 18, AC_PrecLand, _max_outlier_reject_value, 3.0f),    
     AP_GROUPEND
 };
 
