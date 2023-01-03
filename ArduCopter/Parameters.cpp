@@ -720,6 +720,13 @@ const AP_Param::Info Copter::var_info[] = {
     // @User: Advanced
     GSCALAR(comm_timeout_ms, "COMM_TIMEOUT", COMM_TIMEOUT_DEFAULT),
 
+    // @Param: RCOU_LOG_LOOP
+    // @DisplayName: RCOUT Log Loop
+    // @Description: Which loop to log RCOUT values under
+    // @Values: 0:10HZ 1:50Hz 2:100hz 3:400hz
+    // @User: Advanced
+    GSCALAR(rcou_log_loop, "RCOU_LOG_LOOP", RCOU_LOG_LOOP_DEFAULT),
+
     // @Group:
     // @Path: Parameters.cpp
     GOBJECT(g2, "",  ParametersG2),

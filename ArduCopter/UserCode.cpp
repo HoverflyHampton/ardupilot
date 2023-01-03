@@ -12,6 +12,9 @@ void Copter::userhook_init()
 void Copter::userhook_FastLoop()
 {
     // put your 100Hz code here
+    if (g.rcou_log_loop == 2 && should_log(MASK_LOG_RCOUT)) {
+        logger.Write_RCOUT();
+    }
 }
 #endif
 
@@ -19,6 +22,9 @@ void Copter::userhook_FastLoop()
 void Copter::userhook_50Hz()
 {
     // put your 50Hz code here
+    if (g.rcou_log_loop == 1 && should_log(MASK_LOG_RCOUT)) {
+        logger.Write_RCOUT();
+    }
 }
 #endif
 

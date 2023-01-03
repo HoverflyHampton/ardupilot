@@ -335,6 +335,9 @@ void Copter::fourhundred_hz_logging()
     if (should_log(MASK_LOG_ATTITUDE_FAST) && !copter.flightmode->logs_attitude()) {
         Log_Write_Attitude();
     }
+    if (g.rcou_log_loop == 3 && should_log(MASK_LOG_RCOUT)) {
+        logger.Write_RCOUT();
+    }
 }
 
 // ten_hz_logging_loop
@@ -358,7 +361,7 @@ void Copter::ten_hz_logging_loop()
             logger.Write_RSSI();
         }
     }
-    if (should_log(MASK_LOG_RCOUT)) {
+    if (g.rcou_log_loop == 0 && should_log(MASK_LOG_RCOUT)) {
         logger.Write_RCOUT();
     }
     if (should_log(MASK_LOG_NTUN) && (flightmode->requires_GPS() || landing_with_GPS())) {
