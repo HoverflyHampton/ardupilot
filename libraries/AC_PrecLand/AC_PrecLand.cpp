@@ -184,12 +184,21 @@ const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO_FRAME("ORIENT", 18, AC_PrecLand, _orient, AC_PRECLAND_ORIENT_DEFAULT, AP_PARAM_FRAME_ROVER),
 
+    // @Param: OUT_REJ
+    // @DisplayName: Outlier Reject Count
+    // @Description: The number of outlier data samples before accepting outliers
+    // @Range: 1 50
+    // @Increment: 1
+    // @Units: N/A
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("OUT_REJ", 19, AC_PrecLand, _max_outlier_reject_count, 3),
 
     // @Param: POS_OFF_EN
     // @DisplayName: Enable/disable offsetting the target by the craft's position
     // @Description: If enabled, uses the default behavior of offsetting the target by the current position of the craft. If disabled, no offset applied.
     // @Values: 0:Disabled, 1:Enabled
-    AP_GROUPINFO("POS_OFF_EN", 19, AC_PrecLand, _target_pos_offset_enabled, 1),
+    AP_GROUPINFO("POS_OFF_EN", 20, AC_PrecLand, _target_pos_offset_enabled, 1),
 
     AP_GROUPEND
 };
@@ -564,7 +573,7 @@ void AC_PrecLand::run_estimator(float rangefinder_alt_m, bool rangefinder_alt_va
                 } else {
                     float NIS_x = _ekf_x.getPosNIS(_target_pos_rel_meas_NED.x, xy_pos_var);
                     float NIS_y = _ekf_y.getPosNIS(_target_pos_rel_meas_NED.y, xy_pos_var);
-                    if (MAX(NIS_x, NIS_y) < _max_outlier_reject_value || _outlier_reject_count >= 3) {
+                    if (MAX(NIS_x, NIS_y) < 3.0f || _outlier_reject_count >= _max_outlier_reject_count) {
                         _outlier_reject_count = 0;
                         _ekf_x.fusePos(_target_pos_rel_meas_NED.x, xy_pos_var);
                         _ekf_y.fusePos(_target_pos_rel_meas_NED.y, xy_pos_var);
