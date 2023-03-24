@@ -179,6 +179,8 @@ private:
     AP_Int16                    _options;            // Bitmask for extra options
     AP_Enum<Rotation>           _orient;             // Orientation of camera/sensor
 
+    AP_Int8                     _target_pos_offset_enabled;  // Enable offsetting the target by the current position of the craft
+
     uint32_t                    _last_update_ms;    // system time in millisecond when update was last called
     bool                        _target_acquired;   // true if target has been seen recently after estimator is initialized
     bool                        _estimator_initialized; // true if estimator has been initialized after few seconds of the target being detected by sensor

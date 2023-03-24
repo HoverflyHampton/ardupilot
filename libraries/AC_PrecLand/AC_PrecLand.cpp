@@ -184,6 +184,13 @@ const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO_FRAME("ORIENT", 18, AC_PrecLand, _orient, AC_PRECLAND_ORIENT_DEFAULT, AP_PARAM_FRAME_ROVER),
 
+
+    // @Param: POS_OFF_EN
+    // @DisplayName: Enable/disable offsetting the target by the craft's position
+    // @Description: If enabled, uses the default behavior of offsetting the target by the current position of the craft. If disabled, no offset applied.
+    // @Values: 0:Disabled, 1:Enabled
+    AP_GROUPINFO("POS_OFF_EN", 19, AC_PrecLand, _target_pos_offset_enabled, 1),
+
     AP_GROUPEND
 };
 
@@ -408,8 +415,14 @@ bool AC_PrecLand::get_target_position_cm(Vector2f& ret)
     if (!AP::ahrs().get_relative_position_NE_origin(curr_pos)) {
         return false;
     }
-    ret.x = (_target_pos_rel_out_NE.x + curr_pos.x) * 100.0f;   // m to cm
-    ret.y = (_target_pos_rel_out_NE.y  + curr_pos.y) * 100.0f;  // m to cm
+    ret.x = (_target_pos_rel_out_NE.x) * 100.0f;// + curr_pos.x) * 100.0f;   // m to cm
+    ret.y = (_target_pos_rel_out_NE.y) * 100.0f;//  + curr_pos.y) * 100.0f;  // m to cm
+    if(_target_pos_offset_enabled)
+    {
+        ret.x += (curr_pos.x * 100.0f);
+        ret.y += (curr_pos.y * 100.0f);
+    }
+    
     return true;
 }
 
