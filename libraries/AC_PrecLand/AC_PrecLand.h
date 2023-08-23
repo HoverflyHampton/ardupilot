@@ -179,6 +179,8 @@ private:
     AP_Int16                    _options;            // Bitmask for extra options
     AP_Enum<Rotation>           _orient;             // Orientation of camera/sensor
 
+    AP_Float                    _max_outlier_reject_value; // mini-EKF's max value for an outlier
+
     uint32_t                    _last_update_ms;    // system time in millisecond when update was last called
     bool                        _target_acquired;   // true if target has been seen recently after estimator is initialized
     bool                        _estimator_initialized; // true if estimator has been initialized after few seconds of the target being detected by sensor
@@ -188,7 +190,7 @@ private:
 
     PosVelEKF                   _ekf_x, _ekf_y;     // Kalman Filter for x and y axis
     uint32_t                    _outlier_reject_count;  // mini-EKF's outlier counter (3 consecutive outliers lead to EKF accepting updates)
-    AP_Float                    _max_outlier_reject_value; // mini-EKF's max value to be considered an outlier
+    
     Vector3f                    _target_pos_rel_meas_NED; // target's relative position as 3D vector
     Vector3f                    _approach_vector_body;   // unit vector in landing approach direction (in body frame)
 

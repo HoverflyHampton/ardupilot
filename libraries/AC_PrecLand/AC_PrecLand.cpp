@@ -188,7 +188,7 @@ const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
     // @DisplayName: Outlier Max Reject Value
     // @Description: The Maximum value of an outlier before rejection
     // @User: Advanced
-    AP_GROUPINFO("OUTLIER", 19, AC_PrecLand, _max_outlier_reject_value, 3.0f),    
+    AP_GROUPINFO("OUTLIER", 19, AC_PrecLand, _max_outlier_reject_value, 3.0f), 
     AP_GROUPEND
 };
 
@@ -222,7 +222,7 @@ void AC_PrecLand::init(uint16_t update_rate_hz)
 
     // create inertial history buffer
     // constrain lag parameter to be within bounds
-    _lag.set(constrain_float(_lag, 0.02f, 0.25f));
+    _lag.set(constrain_float(_lag, 0.02f, 0.99f));
 
     // calculate inertial buffer size from lag and minimum of main loop rate and update_rate_hz argument
     const uint16_t inertial_buffer_size = MAX((uint16_t)roundf(_lag * MIN(update_rate_hz, AP::scheduler().get_loop_rate_hz())), 1);
@@ -413,8 +413,8 @@ bool AC_PrecLand::get_target_position_cm(Vector2f& ret)
     if (!AP::ahrs().get_relative_position_NE_origin(curr_pos)) {
         return false;
     }
-    ret.x = (_target_pos_rel_out_NE.x + curr_pos.x) * 100.0f;   // m to cm
-    ret.y = (_target_pos_rel_out_NE.y  + curr_pos.y) * 100.0f;  // m to cm
+    ret.x = (_target_pos_rel_out_NE.x + curr_pos.x) * 100.0f; // m to cm
+    ret.y = (_target_pos_rel_out_NE.y + curr_pos.y) * 100.0f; // m to cm
     return true;
 }
 

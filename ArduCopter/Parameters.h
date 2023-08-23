@@ -378,6 +378,9 @@ public:
 
         k_param_vehicle = 257, // vehicle common block of parameters
 
+        // 400 Block : HF Parameters
+        k_param_pland_repo_limit = 401,
+        k_param_landing_xy_scale_factor = 402,
         // the k_param_* space is 9-bits in size
         // 511: reserved
     };
@@ -472,6 +475,9 @@ public:
     AP_Int8                 acro_trainer;
 #endif
 
+    // HF Parameters
+    AP_Int8                 pland_repo_limit;
+    AP_Float                landing_xy_scale_factor;
     // Note: keep initializers here in the same order as they are declared
     // above.
     Parameters()
