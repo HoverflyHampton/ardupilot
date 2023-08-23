@@ -188,7 +188,7 @@ const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
     // @DisplayName: Outlier Max Reject Value
     // @Description: The Maximum value of an outlier before rejection
     // @User: Advanced
-    AP_GROUPINFO("OUTLIER", 18, AC_PrecLand, _max_outlier_reject_value, 3.0f),    
+    AP_GROUPINFO("OUTLIER", 19, AC_PrecLand, _max_outlier_reject_value, 3.0f),    
     AP_GROUPEND
 };
 
