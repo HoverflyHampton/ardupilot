@@ -454,7 +454,24 @@ const AP_Param::Info Copter::var_info[] = {
     GSCALAR(acro_trainer,   "ACRO_TRAINER",     (uint8_t)ModeAcro::Trainer::LIMITED),
 #endif
 
+    //HF Parameters
+    // @Param: REPO_LIMIT
+    // @DisplayName: Precision Landing Reposition Limit
+    // @Description: Enable or disable limits on precision landing repositioning
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Advanced
+    GSCALAR(pland_repo_limit,   "REPO_LIMIT",     (uint8_t)REPO_LIMIT_DEFAULT),
+
+    // @Param: LAND_RPY_SCALE
+    // @DisplayName: Scaling factor on pilot RPY durring landing
+    // @Description: Scales the maximum value of the pilot stick input durring landing
+    // @Values: 0.1 - 10
+    // @User: Advanced
+    GSCALAR(landing_xy_scale_factor,   "LAND_RPY_SCALE",     (float)LAND_RPY_SCALE_DEFAULT),
     // variables not in the g class which contain EEPROM saved variables
+
+
+    
 
 #if CAMERA == ENABLED
     // @Group: CAM_
