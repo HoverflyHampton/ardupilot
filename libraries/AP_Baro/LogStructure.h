@@ -53,7 +53,7 @@ struct PACKED log_BARD {
     { LOG_BARO_MSG, sizeof(log_BARO),                                   \
             "BARO",                                                     \
             "Q"       "B"  "f"    "f"      "f"        "c"     "f"    "I"    "f"       "f"        "B", \
-            "TimeUS," "I," "Alt," "Press," "GndPress" "Temp," "CRt," "SMS," "Offset," "GndTemp," "Health", \
+            "TimeUS," "I," "Alt," "Press," "GndPress," "Temp," "CRt," "SMS," "Offset," "GndTemp," "Health", \
             "s"       "#"  "m"    "P"      "P"        "O"     "n"    "s"    "m"       "O"        "-", \
             "F"       "-"  "0"    "0"      "0"        "B"     "0"    "C"    "?"       "0"        "-", \
             true                                                        \
