@@ -50,49 +50,16 @@ RUN git submodule update --init --recursive
 # setup for SITL
 ENV SKIP_AP_EXT_ENV=$SKIP_AP_EXT_ENV SKIP_AP_GRAPHIC_ENV=$SKIP_AP_GRAPHIC_ENV SKIP_AP_COV_ENV=$SKIP_AP_COV_ENV SKIP_AP_GIT_CHECK=$SKIP_AP_GIT_CHECK
 RUN Tools/environment_install/install-prereqs-ubuntu.sh -y
-
 RUN ./waf distclean
 RUN ./waf configure --board sitl
 RUN ./waf copter
 
-# Multistage to remove the large arducopter file size
-FROM ${BASE_IMAGE}:${TAG} as run_stage
-
-ARG DEBIAN_FRONTEND=noninteractive
-ARG USER_NAME=ardupilot
-ARG USER_UID=1000
-ARG USER_GID=1000
-ARG SKIP_AP_EXT_ENV=1
-ARG SKIP_AP_GRAPHIC_ENV=1
-ARG SKIP_AP_COV_ENV=1
-ARG SKIP_AP_GIT_CHECK=1
-ARG SKIP_AP_COMPLETION_ENV=1
-WORKDIR /${USER_NAME}
-
-RUN groupadd ${USER_NAME} --gid ${USER_GID}\
-    && useradd -l -m ${USER_NAME} -u ${USER_UID} -g ${USER_GID} -s /bin/bash
-
-RUN apt-get update && apt-get install --no-install-recommends -y \
-lsb-release \
-ca-certificates \
-sudo \
-tzdata \
-bash-completion \
-git
-
-ENV USER=${USER_NAME}
-
-RUN echo "ardupilot ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USER_NAME}
-RUN chmod 0440 /etc/sudoers.d/${USER_NAME}
-
-RUN chown -R ${USER_NAME}:${USER_NAME} /${USER_NAME}
-
-USER ${USER_NAME}
 # Expose the SIM mavlink port
 EXPOSE 5760/tcp
 
 # Variables for simulator
 ENV INSTANCE 0
+ENV SYSID 1
 ENV LAT 28.80498009382373
 ENV LON -81.31741091852288
 ENV ALT 14
@@ -101,14 +68,4 @@ ENV MODEL +
 ENV SPEEDUP 1
 ENV VEHICLE ArduCopter
 
-COPY --from=build /ardupilot/ardupilot/Tools/autotest/* ./Tools/autotest/
-RUN export PATH=/${USER_NAME}/Tools/autotest/:\$PATH
-COPY --from=build /ardupilot/ardupilot/modules/mavlink/* ./modules/mavlink/
-COPY --from=build /ardupilot/ardupilot/build/sitl/* ./build/sitl/
-# COPY --from=build /ardupilot/ardupilot/Tools/environment_install/install-prereqs-ubuntu.sh ./Tools/environment_install/install-prereqs-ubuntu.sh
-
-# ENV SKIP_AP_EXT_ENV=$SKIP_AP_EXT_ENV SKIP_AP_GRAPHIC_ENV=$SKIP_AP_GRAPHIC_ENV SKIP_AP_COV_ENV=$SKIP_AP_COV_ENV SKIP_AP_GIT_CHECK=$SKIP_AP_GIT_CHECK SKIP_AP_COMPLETION_ENV=$SKIP_AP_COMPLETION_ENV
-# RUN Tools/environment_install/install-prereqs-ubuntu.sh -y
-
-
-ENTRYPOINT ["/bin/bash", "-c", "/ardupilot/Tools/autotest/sim_vehicle.py --vehicle ${VEHICLE} -I${INSTANCE} --custom-location=${LAT},${LON},${ALT},${DIR} -w --frame ${MODEL} --no-rebuild --no-mavproxy --speedup ${SPEEDUP}"]
+ENTRYPOINT ["/bin/bash", "-c", "/ardupilot/ardupilot/Tools/autotest/sim_vehicle.py --vehicle ${VEHICLE} -I${INSTANCE} --sysid ${SYSID} --custom-location=${LAT},${LON},${ALT},${DIR} -w --frame ${MODEL} --no-mavproxy --no-rebuild --out --speedup ${SPEEDUP}"]
