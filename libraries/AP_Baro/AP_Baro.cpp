@@ -90,7 +90,7 @@ const AP_Param::GroupInfo AP_Baro::var_info[] = {
     // @ReadOnly: True
     // @Volatile: True
     // @User: Advanced
-    AP_GROUPINFO_FLAGS("1_GND_PRESS", 2, AP_Baro, sensors[0].ground_pressure, 0, AP_PARAM_FLAG_INTERNAL_USE_ONLY),
+    AP_GROUPINFO("1_GND_PRESS", 2, AP_Baro, sensors[0].ground_pressure, 0),
 
     // @Param: _GND_TEMP
     // @DisplayName: ground temperature
@@ -142,7 +142,7 @@ const AP_Param::GroupInfo AP_Baro::var_info[] = {
     // @ReadOnly: True
     // @Volatile: True
     // @User: Advanced
-    AP_GROUPINFO_FLAGS("2_GND_PRESS", 9, AP_Baro, sensors[1].ground_pressure, 0, AP_PARAM_FLAG_INTERNAL_USE_ONLY),
+    AP_GROUPINFO("2_GND_PRESS", 9, AP_Baro, sensors[1].ground_pressure, 0),
 
     // Slot 10 used to be TEMP2
 #endif
@@ -156,7 +156,7 @@ const AP_Param::GroupInfo AP_Baro::var_info[] = {
     // @ReadOnly: True
     // @Volatile: True
     // @User: Advanced
-    AP_GROUPINFO_FLAGS("3_GND_PRESS", 11, AP_Baro, sensors[2].ground_pressure, 0, AP_PARAM_FLAG_INTERNAL_USE_ONLY),
+    AP_GROUPINFO("3_GND_PRESS", 11, AP_Baro, sensors[2].ground_pressure, 0),
 
     // Slot 12 used to be TEMP3
 #endif
