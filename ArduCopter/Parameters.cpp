@@ -442,6 +442,13 @@ const AP_Param::Info Copter::var_info[] = {
     GSCALAR(acro_trainer,   "ACRO_TRAINER",     (uint8_t)ModeAcro::Trainer::LIMITED),
 #endif
 
+    // @Param: LAND_RPY_SCALE
+    // @DisplayName: Scaling factor on pilot RPY durring landing
+    // @Description: Scales the maximum value of the pilot stick input durring landing
+    // @Values: 0.1 - 10
+    // @User: Advanced
+    GSCALAR(landing_xy_scale_factor,   "LAND_RPY_SCALE",     (float)LAND_RPY_SCALE_DEFAULT),
+
     // variables not in the g class which contain EEPROM saved variables
 
 #if AP_CAMERA_ENABLED
